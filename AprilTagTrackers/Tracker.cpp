@@ -1759,12 +1759,14 @@ void Tracker::MainLoop()
                 if (abs(dZ) > 0.1)
                     dZ = 0.1 * (dZ / abs(dZ));
 
-                gui->manualCalibX->SetValue(gui->manualCalibX->value + dX);
-                gui->manualCalibY->SetValue(gui->manualCalibY->value + dY);
-                gui->manualCalibZ->SetValue(gui->manualCalibZ->value + dZ);
-
-                gui->manualCalibA->SetValue(gui->manualCalibA->value + 0.1 * (angleA - angleADriver));
-                gui->manualCalibB->SetValue(gui->manualCalibB->value + 0.1 * (angleB - angleBDriver));
+                gui->CallAfter([this, dX, dY, dZ, angleA, angleADriver, angleB, angleBDriver] ()
+                               {
+                                   gui->manualCalibX->SetValue(gui->manualCalibX->value + dX);
+                                   gui->manualCalibY->SetValue(gui->manualCalibY->value + dY);
+                                   gui->manualCalibZ->SetValue(gui->manualCalibZ->value + dZ);
+                                   gui->manualCalibA->SetValue(gui->manualCalibA->value + 0.1 * (angleA - angleADriver));
+                                   gui->manualCalibB->SetValue(gui->manualCalibB->value + 0.1 * (angleB - angleBDriver));
+                               });
                 calibScale = calibScale - 0.1 * (1 - (xyzLenDriver / xyzLen));
 
                 if (calibScale > 1.2)
