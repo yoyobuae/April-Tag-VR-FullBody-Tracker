@@ -1355,8 +1355,6 @@ void Tracker::MainLoop()
                 tvec[1] = rpos.at<double>(1, 0);
                 tvec[2] = rpos.at<double>(2, 0);
 
-                cv::aruco::drawAxis(drawImg, parameters->camMat, parameters->distCoeffs, rvec, tvec, 0.10);
-
                 if (!trackerStatus[i].boardFound)
                 {
                     trackerStatus[i].maskCenter = projected[0];
@@ -1686,7 +1684,7 @@ void Tracker::MainLoop()
             //convert rodriguez rotation to quaternion
             Quaternion<double> q = rodr2quat(trackerStatus[i].boardRvec[0], trackerStatus[i].boardRvec[1], trackerStatus[i].boardRvec[2]);
 
-            //cv::aruco::drawAxis(drawImg, parameters->camMat, parameters->distCoeffs, boardRvec[i], boardTvec[i], 0.05);
+            cv::aruco::drawAxis(drawImg, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05);
 
             q = Quaternion<double>(0, 0, 1, 0) * (wrotation * q) * Quaternion<double>(0, 0, 1, 0);
 
