@@ -44,6 +44,7 @@ bool MyApp::OnInit()
     Connect(GUI::LOCK_HEIGHT_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(MyApp::ButtonPressedLockHeight));
     Connect(GUI::DISABLE_OUT_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(MyApp::ButtonPressedDisableOut));
     Connect(GUI::DISABLE_OPENVR_API_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(MyApp::ButtonPressedDisableOpenVrApi));
+    Connect(GUI::PRIVACY_MODE, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(MyApp::ButtonPressedPrivacyMode));
 
     return true;
 }
@@ -135,6 +136,18 @@ void MyApp::ButtonPressedDisableOpenVrApi(wxCommandEvent& event)
     {
         tracker->disableOpenVrApi = false;
         conn->disableOpenVrApi = false;
+    }
+}
+
+void MyApp::ButtonPressedPrivacyMode(wxCommandEvent& event)
+{
+    if (event.IsChecked())
+    {
+        tracker->privacyMode = true;
+    }
+    else
+    {
+        tracker->privacyMode = false;
     }
 }
 

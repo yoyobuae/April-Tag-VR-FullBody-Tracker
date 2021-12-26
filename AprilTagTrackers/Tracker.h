@@ -47,6 +47,7 @@ public:
     bool lockHeightCalib = false;
     bool disableOut = false;
     bool disableOpenVrApi = true;
+    bool privacyMode = false;
     int messageDialogResponse = wxID_CANCEL;
 
     GUI* gui;

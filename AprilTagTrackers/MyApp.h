@@ -35,4 +35,5 @@ public:
     void ButtonPressedLockHeight(wxCommandEvent&);
     void ButtonPressedDisableOut(wxCommandEvent&);
     void ButtonPressedDisableOpenVrApi(wxCommandEvent&);
+    void ButtonPressedPrivacyMode(wxCommandEvent&);
 };

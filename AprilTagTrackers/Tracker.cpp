@@ -1275,6 +1275,7 @@ void Tracker::MainLoop()
         CopyFreshCameraImageTo(image);
 
         drawImg = image;
+        cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
         april.convertToSingleChannel(image, gray);
 
         clock_t start, end;
@@ -1339,6 +1340,7 @@ void Tracker::MainLoop()
 
 
             cv::circle(drawImg, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
+            cv::circle(drawImgMasked, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
 
             if (tracker_pose_valid == 0)
             {
@@ -1405,11 +1407,13 @@ void Tracker::MainLoop()
             {
                 cv::circle(mask, trackerStatus[i].maskCenter, size, cv::Scalar(255, 0, 0), -1, 8, 0);
                 cv::circle(drawImg, trackerStatus[i].maskCenter, size, cv::Scalar(255, 0, 0), 2, 8, 0);
+                cv::circle(drawImgMasked, trackerStatus[i].maskCenter, size, cv::Scalar(255, 0, 0), 2, 8, 0);
             }
             else
             {
                 rectangle(mask, cv::Point(trackerStatus[i].maskCenter.x - size, 0), cv::Point(trackerStatus[i].maskCenter.x + size, image.rows), cv::Scalar(255, 0, 0), -1);
                 rectangle(drawImg, cv::Point(trackerStatus[i].maskCenter.x - size, 0), cv::Point(trackerStatus[i].maskCenter.x + size, image.rows), cv::Scalar(255, 0, 0), 3);
+                rectangle(drawImgMasked, cv::Point(trackerStatus[i].maskCenter.x - size, 0), cv::Point(trackerStatus[i].maskCenter.x + size, image.rows), cv::Scalar(255, 0, 0), 3);
             }
         }
 
@@ -1685,6 +1689,7 @@ void Tracker::MainLoop()
             Quaternion<double> q = rodr2quat(trackerStatus[i].boardRvec[0], trackerStatus[i].boardRvec[1], trackerStatus[i].boardRvec[2]);
 
             cv::aruco::drawAxis(drawImg, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05);
+            cv::aruco::drawAxis(drawImgMasked, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05);
 
             q = Quaternion<double>(0, 0, 1, 0) * (wrotation * q) * Quaternion<double>(0, 0, 1, 0);
 
@@ -1777,8 +1782,26 @@ void Tracker::MainLoop()
 
         }
 
-        if (ids.size() > 0)
+        {
+            cv::Mat mask = cv::Mat::zeros(image.size(), image.type());
+
+            for (int i = 0; i < corners.size(); i++)
+            {
+                std::vector<cv::Point> points;
+                for(int j = 0; j < corners[i].size(); j++){
+                    points.push_back(corners[i].at(j));
+                }
+                cv::fillConvexPoly(mask, points, cv::Scalar(255, 255, 255), 8, 0);
+            }
+
+            drawImg.copyTo(drawImgMasked, mask);
+        }
+
+
+        if (ids.size() > 0) {
             cv::aruco::drawDetectedMarkers(drawImg, corners, ids);
+            cv::aruco::drawDetectedMarkers(drawImgMasked, corners, ids);
+        }
 
         end = clock();
         double frameTime = double(end - start) / double(CLOCKS_PER_SEC);
@@ -1797,7 +1820,10 @@ void Tracker::MainLoop()
                 rows = image.rows * drawImgSize / image.cols;
             }
             cv::Mat *outImg = new cv::Mat();
-            cv::resize(drawImg, *outImg, cv::Size(cols, rows));
+            if (privacyMode)
+                cv::resize(drawImgMasked, *outImg, cv::Size(cols, rows));
+            else
+                cv::resize(drawImg, *outImg, cv::Size(cols, rows));
             cv::putText(*outImg, std::to_string(frameTime).substr(0, 5), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255));
             if (showTimeProfile)
             {
