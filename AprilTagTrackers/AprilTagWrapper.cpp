@@ -10,6 +10,7 @@
 #include <apriltag.h>
 #include <tagStandard41h12.h>
 #include <tagCircle21h7.h>
+#include "tagCustom29h10.h"
 
 #include "Parameters.h"
 
@@ -21,6 +22,8 @@ AprilTagWrapper::AprilTagWrapper(const Parameters* params)
     apriltag_family_t* tf;
     if (parameters->markerLibrary == APRILTAG_CIRCULAR)
         tf = tagCircle21h7_create();
+    else if (parameters->markerLibrary == APRILTAG_CUSTOM29H10)
+        tf = tagCustom29h10_create();
     else
         tf = tagStandard41h12_create();
 

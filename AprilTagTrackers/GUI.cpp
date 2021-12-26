@@ -201,6 +201,7 @@ ParamsPage::ParamsPage(wxNotebook* parent, Parameters* params, Connection* conn)
     markerLibraryValues.Add(wxT("ApriltagCircular"));
     markerLibraryValues.Add(wxT("Aruco4x4"));
     markerLibraryValues.Add(wxT("ApriltagColor"));
+    markerLibraryValues.Add(wxT("ApriltagCustom29h10"));
 
     markerLibraryField = new wxChoice(this, -1, wxDefaultPosition, wxDefaultSize, markerLibraryValues);
     markerLibraryField->SetSelection(parameters->markerLibrary);
