@@ -10,6 +10,7 @@
 
 void drawMarker(cv::Mat, std::vector<cv::Point2f>, cv::Scalar);
 void transformMarkerSpace(std::vector<cv::Point3f>, cv::Vec3d, cv::Vec3d, cv::Vec3d, cv::Vec3d, std::vector<cv::Point3f>*);
+void offsetFromBoardToCameraSpace(std::vector<cv::Point3f> points, cv::Vec3d boardRvec, cv::Vec3d boardTvec, std::vector<cv::Point3f>* out);
 void getMedianMarker(std::vector<std::vector<cv::Point3f>>, std::vector<cv::Point3f>*);
 Quaternion<double> rodr2quat(double, double, double);
 cv::Mat getSpaceCalib(cv::Vec3d, cv::Vec3d, double, double, double);

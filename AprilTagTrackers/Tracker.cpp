@@ -1225,33 +1225,38 @@ void Tracker::MainLoop()
     std::vector<cv::Ptr<cv::aruco::Board>> trackers;
     std::vector<std::vector<int>> boardIds;
     std::vector<std::vector < std::vector<cv::Point3f >>> boardCorners;
+    std::vector<cv::Point3f > boardCenters;
+
+    for (int i = 0; i < this->trackers.size(); i++)
+    {
+        boardCorners.push_back(this->trackers[i]->objPoints);
+        boardIds.push_back(this->trackers[i]->ids);
+        boardCenters.push_back(cv::Point3f(0, 0, 0));
+
+        int numOfCorners = 0;
+        for (int j = 0; j < boardCorners[i].size(); j++)
+        {
+            for (int k = 0; k < boardCorners[i][j].size(); k++)
+            {
+                boardCenters[i].x += boardCorners[i][j][k].x;
+                boardCenters[i].y += boardCorners[i][j][k].y;
+                boardCenters[i].z += boardCorners[i][j][k].z;
+                numOfCorners++;
+            }
+        }
+        boardCenters[i] /= numOfCorners;
+    }
 
     if (parameters->trackerCalibCenters)
     {
         for (int i = 0; i < this->trackers.size(); i++)
         {
-            boardCorners.push_back(this->trackers[i]->objPoints);
-            boardIds.push_back(this->trackers[i]->ids);
-
-            cv::Point3f boardCenter = cv::Point3f(0, 0, 0);
-            int numOfCorners = 0;
             for (int j = 0; j < boardCorners[i].size(); j++)
             {
                 for (int k = 0; k < boardCorners[i][j].size(); k++)
                 {
-                    boardCenter.x += boardCorners[i][j][k].x;
-                    boardCenter.y += boardCorners[i][j][k].y;
-                    boardCenter.z += boardCorners[i][j][k].z;
-                    numOfCorners++;
-                }
-            }
-            boardCenter /= numOfCorners;
-
-            for (int j = 0; j < boardCorners[i].size(); j++)
-            {
-                for (int k = 0; k < boardCorners[i][j].size(); k++)
-                {
-                    boardCorners[i][j][k] -= boardCenter;
+                    boardCorners[i][j][k] -= boardCenters[i];
+                    boardCenters[i] = cv::Point3f(0, 0, 0);
                 }
             }
 
@@ -1329,41 +1334,60 @@ void Tracker::MainLoop()
             rpos.at<double>(3, 0) = 1;
             rpos = wtranslation.inv() * rpos;
 
-            std::vector<cv::Point3d> point;
-            point.push_back(cv::Point3d(rpos.at<double>(0, 0), rpos.at<double>(1, 0), rpos.at<double>(2, 0)));
-            point.push_back(cv::Point3d(trackerStatus[i].boardTvec));
-
-            std::vector<cv::Point2d> projected;
-            cv::Vec3d rvec, tvec;
-
-            cv::projectPoints(point, rvec, tvec, parameters->camMat, parameters->distCoeffs, projected);
-
-
-            cv::circle(drawImg, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
-            cv::circle(drawImgMasked, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
+            cv::Vec3d rvec;
+            cv::Vec3d tvec;
 
             if (tracker_pose_valid == 0)
             {
-
                 Quaternion<double> q = Quaternion<double>(qw, qx, qy, qz);
                 q = q.UnitQuaternion();
 
                 //q = Quaternion<double>(0, 0, 1, 0) * (wrotation * q) * Quaternion<double>(0, 0, 1, 0);
                 q = wrotation.inverse() * Quaternion<double>(0, 0, 1, 0).inverse() * q * Quaternion<double>(0, 0, 1, 0).inverse();
 
-                cv::Vec3d rvec = quat2rodr(q.w, q.x, q.y, q.z);
-                cv::Vec3d tvec;
+                rvec = quat2rodr(q.w, q.x, q.y, q.z);
                 tvec[0] = rpos.at<double>(0, 0);
                 tvec[1] = rpos.at<double>(1, 0);
                 tvec[2] = rpos.at<double>(2, 0);
+            }
+            else {
+                tvec = trackerStatus[i].boardTvec;
+                rvec = trackerStatus[i].boardRvec;
+            }
+
+            std::vector<cv::Point3f> offsetin, offsetout;
+            offsetin.push_back(boardCenters[i]);
+            offsetFromBoardToCameraSpace(offsetin, rvec, tvec, &offsetout);
+
+            std::vector<cv::Point3d> point;
+            point.push_back(cv::Point3d(rpos.at<double>(0, 0), rpos.at<double>(1, 0), rpos.at<double>(2, 0)));
+            point.push_back(cv::Point3d(trackerStatus[i].boardTvec));
+            point.push_back(cv::Point3d(rpos.at<double>(0, 0), rpos.at<double>(1, 0), rpos.at<double>(2, 0)) + cv::Point3d(offsetout[0]));
+            point.push_back(cv::Point3d(trackerStatus[i].boardTvec) + cv::Point3d(offsetout[0]));
+
+            std::vector<cv::Point2d> projected;
+            cv::Vec3d identity_rvec, identity_tvec;
+
+            cv::projectPoints(point, identity_rvec, identity_tvec, parameters->camMat, parameters->distCoeffs, projected);
+
+
+            cv::circle(drawImg, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
+            cv::circle(drawImgMasked, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
+            cv::circle(drawImg, projected[2], 5, cv::Scalar(0, 255, 255), 2, 8, 0);
+            cv::circle(drawImgMasked, projected[2], 5, cv::Scalar(0, 255, 255), 2, 8, 0);
+            cv::circle(drawImg, projected[3], 5, cv::Scalar(255, 0, 255), 2, 8, 0);
+            cv::circle(drawImgMasked, projected[3], 5, cv::Scalar(255, 0, 255), 2, 8, 0);
+
+            if (tracker_pose_valid == 0)
+            {
 
                 if (!trackerStatus[i].boardFound)
                 {
-                    trackerStatus[i].maskCenter = projected[0];
+                    trackerStatus[i].maskCenter = projected[2];
                 }
                 else
                 {
-                    trackerStatus[i].maskCenter = projected[1];
+                    trackerStatus[i].maskCenter = projected[3];
                 }
 
                 trackerStatus[i].boardFound = true;
@@ -1377,7 +1401,7 @@ void Tracker::MainLoop()
             {
                 if (trackerStatus[i].boardFound)
                 {
-                    trackerStatus[i].maskCenter = projected[1];
+                    trackerStatus[i].maskCenter = projected[3];
                 }
 
                 trackerStatus[i].boardFoundDriver = false;        //do we really need to do this? test later
