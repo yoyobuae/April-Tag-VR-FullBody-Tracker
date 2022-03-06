@@ -108,6 +108,7 @@ void Parameters::Load()
         fs["calibScale"] >> calibScale;
         if (calibScale < 0.5)
             calibScale = 1;
+        fs["ipcAddr"] >> ipcAddr;
         if(!wrotmat.empty())
             wrotation = Quaternion<double>(wrotmat.at<double>(0), wrotmat.at<double>(1), wrotmat.at<double>(2), wrotmat.at<double>(3));
         fn = fs["trackers"];
@@ -227,6 +228,7 @@ void Parameters::Save()
     fs << "markerLibrary" << markerLibrary;
     fs << "languageSelection" << languageSelection;
     fs << "calibScale" << calibScale;
+    fs << "ipcAddr" << ipcAddr;
 
     fs << "trackers";
     fs << "{";

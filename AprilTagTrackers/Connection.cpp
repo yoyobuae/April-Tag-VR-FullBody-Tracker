@@ -245,7 +245,7 @@ void Connection::Connect()
 std::istringstream Connection::Send(std::string buffer)
 {
 
-    Ipc::Client client("ApriltagPipeIn");
+    Ipc::Client client(parameters->ipcAddr);
     std::string rec = client.sendrecv(buffer);
     return std::istringstream(rec);
 }
