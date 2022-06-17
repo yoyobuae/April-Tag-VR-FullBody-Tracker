@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <chrono>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -21,6 +22,7 @@ struct TrackerStatus {
     bool boardFound, boardFoundDriver;
     std::vector<std::vector<double>> prevLocValues;
     cv::Point2d maskCenter;
+    std::chrono::milliseconds last_update_timestamp;
 };
 
 class Connection;

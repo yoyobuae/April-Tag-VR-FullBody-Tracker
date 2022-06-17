@@ -19,6 +19,7 @@ AprilTagWrapper::AprilTagWrapper(const Parameters* params)
     , parameters(params)
 {
     td->quad_decimate = parameters->quadDecimate;
+    td->nthreads = 1;
     apriltag_family_t* tf;
     if (parameters->markerLibrary == APRILTAG_CIRCULAR)
         tf = tagCircle21h7_create();
