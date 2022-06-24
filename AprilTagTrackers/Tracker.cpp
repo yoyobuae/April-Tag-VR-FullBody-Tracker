@@ -289,6 +289,8 @@ void Tracker::CameraLoop()
     double fps = 0;
     last_frame_time = clock();
     bool frame_visible = false;
+    int cols, rows;
+
     while (cameraRunning)
     {
         if (!cap.read(img))
@@ -312,14 +314,24 @@ void Tracker::CameraLoop()
         std::string resolution = std::to_string(img.cols) + "x" + std::to_string(img.rows);
         if (previewCamera || previewCameraCalibration)
         {
+            if (img.cols < img.rows)
+            {
+                cols = img.cols * drawImgSize / img.rows;
+                rows = drawImgSize;
+            }
+            else
+            {
+                cols = drawImgSize;
+                rows = img.rows * drawImgSize / img.cols;
+            }
             img.copyTo(drawImg);
             cv::putText(drawImg, std::to_string((int)(fps + (0.5))), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
             cv::putText(drawImg, resolution, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
             if (previewCameraCalibration)
             {
                 cv::Mat *outImg = new cv::Mat();
-                drawImg.copyTo(*outImg);
-                previewCalibration(*outImg, parameters);
+                previewCalibration(drawImg, parameters);
+                cv::resize(drawImg, *outImg, cv::Size(cols, rows));
                 gui->CallAfter([outImg] ()
                                {
                                cv::imshow("Preview", *outImg);
@@ -331,7 +343,7 @@ void Tracker::CameraLoop()
             else
             {
                 cv::Mat *outImg = new cv::Mat();
-                drawImg.copyTo(*outImg);
+                cv::resize(drawImg, *outImg, cv::Size(cols, rows));
                 gui->CallAfter([outImg] ()
                                {
                                cv::imshow("Preview", *outImg);
@@ -508,7 +520,7 @@ void Tracker::CalibrateCameraCharuco()
     {
         CopyFreshCameraImageTo(image);
         int cols, rows;
-        if (image.cols > image.rows)
+        if (image.cols < image.rows)
         {
             cols = image.cols * drawImgSize / image.rows;
             rows = drawImgSize;
@@ -767,7 +779,7 @@ void Tracker::CalibrateCamera()
         CopyFreshCameraImageTo(image);
         cv::putText(image, std::to_string(i) + "/" + std::to_string(picNum), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255));
         int cols, rows;
-        if (image.cols > image.rows)
+        if (image.cols < image.rows)
         {
             cols = image.cols * drawImgSize / image.rows;
             rows = drawImgSize;
@@ -1122,7 +1134,7 @@ void Tracker::CalibrateTracker()
             }
         }
         int cols, rows;
-        if (image.cols > image.rows)
+        if (image.cols < image.rows)
         {
             cols = image.cols * drawImgSize / image.rows;
             rows = drawImgSize;
@@ -1855,7 +1867,7 @@ void Tracker::MainLoop()
         if (!disableOut)
         {
             int cols, rows;
-            if (image.cols > image.rows)
+            if (image.cols < image.rows)
             {
                 cols = image.cols * drawImgSize / image.rows;
                 rows = drawImgSize;

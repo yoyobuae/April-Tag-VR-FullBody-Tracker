@@ -67,7 +67,7 @@ private:
     void CalibrateTracker();
     void MainLoop();
 
-    int drawImgSize = 480;
+    int drawImgSize = 1385;
 
     cv::VideoCapture cap;
 
