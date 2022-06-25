@@ -1825,8 +1825,8 @@ void Tracker::MainLoop()
                                    gui->manualCalibX->SetValue(gui->manualCalibX->value + dX);
                                    gui->manualCalibY->SetValue(gui->manualCalibY->value + dY);
                                    gui->manualCalibZ->SetValue(gui->manualCalibZ->value + dZ);
-                                   gui->manualCalibA->SetValue(gui->manualCalibA->value + 0.1 * (angleA - angleADriver));
-                                   gui->manualCalibB->SetValue(gui->manualCalibB->value + 0.1 * (angleB - angleBDriver));
+                                   // gui->manualCalibA->SetValue(gui->manualCalibA->value + 0.1 * (angleA - angleADriver));
+                                   // gui->manualCalibB->SetValue(gui->manualCalibB->value + 0.1 * (angleB - angleBDriver));
                                });
                 calibScale = calibScale - 0.1 * (1 - (xyzLenDriver / xyzLen));
 
