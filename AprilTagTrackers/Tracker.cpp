@@ -585,10 +585,9 @@ void Tracker::CalibrateCameraCharuco()
                         });
 
         //framesSinceLast++;
-        if (key != -1 || double(clock() - timeOfLast) / double(CLOCKS_PER_SEC) > 1)
+        if (key != -1 || double(clock() - timeOfLast) / (2*double(CLOCKS_PER_SEC)) > 1)
         {
             //framesSinceLast = 0;
-            timeOfLast = clock();
             //if any button was pressed
             cvtColor(image, gray, cv::COLOR_BGR2GRAY);
 
@@ -644,6 +643,7 @@ void Tracker::CalibrateCameraCharuco()
                     }
                 }
             }
+            timeOfLast = clock();
         }
     }
 
