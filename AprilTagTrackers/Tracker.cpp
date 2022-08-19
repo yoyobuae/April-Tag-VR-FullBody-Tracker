@@ -1756,13 +1756,46 @@ void Tracker::MainLoop()
             end = clock();
             double frameTime = double(end - last_frame_time) / double(CLOCKS_PER_SEC);
 
-#if 1
+#if 0
             if (a < -1.5 || a > 1.5 || b < -0.5 || b > 2.5 || c < -1.5 || c > 1.5)
             {
                 trackerStatus[i].boardFound = false;
             }
 #endif
 #if 1
+            // Reject detected positions that are behind or too far from the camera
+            if ((trackerStatus[i].boardTvec[2]  < 0) || (trackerStatus[i].boardTvec[2]  > 3.0))
+            {
+                trackerStatus[i].boardFound = false;
+                continue;
+            }
+
+            // Figure out the camera aspect ratio, XZ and YZ ratio limits
+            double aspectRatio = (double)image.cols/(double)image.rows;
+            double XZratioLimit = 0.5*(double)image.cols/parameters->camMat.at<double>(0,0);
+            double YZratioLimit = 0.5*(double)image.rows/parameters->camMat.at<double>(1,1);
+
+            // Figure out which dimension is most likely to go outside the camera field of view
+            if (abs(trackerStatus[i].boardTvec[0]/trackerStatus[i].boardTvec[1]) > aspectRatio)
+            {
+                // Check that X coordinate doesn't go out of camera FOV
+                if (abs(trackerStatus[i].boardTvec[0]/trackerStatus[i].boardTvec[2]) > XZratioLimit)
+                {
+                    trackerStatus[i].boardFound = false;
+                    continue;
+                }
+            }
+            else
+            {
+                // Check that Y coordinate doesn't go out of camera FOV
+                if (abs(trackerStatus[i].boardTvec[1]/trackerStatus[i].boardTvec[2]) > YZratioLimit)
+                {
+                    trackerStatus[i].boardFound = false;
+                    continue;
+                }
+            }
+#endif
+#if 0
             if ((current_timestamp.count() - trackerStatus[i].last_update_timestamp.count()) > 100.0)
                 continue;
 #endif
