@@ -1590,7 +1590,7 @@ void Tracker::MainLoop()
                 gui->manualCalibA->SetValue(270);
 #endif
 
-            cv::Vec3d calibRot(gui->manualCalibA->value * 0.01745, gui->manualCalibB->value * 0.01745, gui->manualCalibC->value * 0.01745);
+            cv::Vec3d calibRot(gui->manualCalibA->value * (M_PI/180.0), gui->manualCalibB->value * (M_PI/180.0), gui->manualCalibC->value * (M_PI/180.0));
             cv::Vec3d calibPos(gui->manualCalibX->value / 100, gui->manualCalibY->value / 100, gui->manualCalibZ->value / 100);
             cv::Vec3d calibRodr(cos(calibRot[0]) * cos(calibRot[1]) * 3.14, sin(calibRot[1]) * 3.14, sin(calibRot[0]) * cos(calibRot[1]) * 3.14);
 
