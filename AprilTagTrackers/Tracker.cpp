@@ -231,6 +231,9 @@ void Tracker::StartCamera(std::string id, int apiPreference)
     }
     //Sleep(1000);
 
+    double codec = 0x47504A4D; //code by FPaul. Should use MJPEG codec to enable fast framerates.
+    cap.set(cv::CAP_PROP_FOURCC, codec);
+
     // On Linux and when GStreamer backend is used we already setup the camera pixel format,
     // width, height and FPS above when the GStreamer pipeline was created.
 #if defined(__LINUX__)
@@ -256,8 +259,6 @@ void Tracker::StartCamera(std::string id, int apiPreference)
         cap.set(cv::CAP_PROP_GAIN, parameters->cameraGain);
     }
 
-    double codec = 0x47504A4D; //code by FPaul. Should use MJPEG codec to enable fast framerates.
-    cap.set(cv::CAP_PROP_FOURCC, codec);
 
     cameraRunning = true;
     cameraThread = std::thread(&Tracker::CameraLoop, this);
