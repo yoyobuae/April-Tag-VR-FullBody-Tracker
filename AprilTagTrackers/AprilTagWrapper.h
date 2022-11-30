@@ -14,6 +14,7 @@ const int APRILTAG_CIRCULAR = 1;
 const int ARUCO_4X4 = 2;
 const int APRILTAG_COLOR = 3;
 const int APRILTAG_CUSTOM29H10 = 4;
+const int APRILTAG_CUSTOM28H9 = 5;
 
 class AprilTagWrapper
 {
