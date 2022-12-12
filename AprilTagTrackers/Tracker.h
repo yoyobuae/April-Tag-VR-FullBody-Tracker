@@ -23,6 +23,7 @@ struct TrackerStatus {
     std::vector<std::vector<double>> prevLocValues;
     cv::Point2d maskCenter;
     std::chrono::milliseconds last_update_timestamp;
+    int searchSize;
 };
 
 class Connection;

@@ -1200,6 +1200,7 @@ void Tracker::MainLoop()
         trackerStatus[i].boardTvec = cv::Vec3d(0, 0, 0);
         trackerStatus[i].prevLocValues = std::vector<std::vector<double>>(7, std::vector<double>());
         trackerStatus[i].last_update_timestamp = std::chrono::milliseconds(0);
+        trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0));
     }
 
     //previous values, used for moving median to remove any outliers.
@@ -1398,10 +1399,12 @@ void Tracker::MainLoop()
                 if (!trackerStatus[i].boardFound)
                 {
                     trackerStatus[i].maskCenter = projected[2];
+                    trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[2].z);
                 }
                 else
                 {
                     trackerStatus[i].maskCenter = projected[3];
+                    trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[3].z);
                 }
 
                 trackerStatus[i].boardFound = true;
@@ -1416,6 +1419,7 @@ void Tracker::MainLoop()
                 if (trackerStatus[i].boardFound)
                 {
                     trackerStatus[i].maskCenter = projected[3];
+                    trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[3].z);
                 }
 
                 trackerStatus[i].boardFoundDriver = false;        //do we really need to do this? test later
@@ -1427,8 +1431,6 @@ void Tracker::MainLoop()
         cv::Mat mask = cv::Mat::zeros(gray.size(), gray.type());
 
         cv::Mat dstImage = cv::Mat::zeros(gray.size(), gray.type());
-
-        int size = gray.rows * parameters->searchWindow;
 
         bool doMasking = false;
 
@@ -1443,15 +1445,27 @@ void Tracker::MainLoop()
             doMasking = true;
             if (circularWindow)
             {
-                cv::circle(mask, trackerStatus[i].maskCenter, size, cv::Scalar(255, 0, 0), -1, 8, 0);
-                cv::circle(drawImg, trackerStatus[i].maskCenter, size, cv::Scalar(255, 0, 0), 2, 8, 0);
-                cv::circle(drawImgMasked, trackerStatus[i].maskCenter, size, cv::Scalar(255, 0, 0), 2, 8, 0);
+                cv::circle(mask, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), -1, 8, 0);
+                cv::circle(drawImg, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), 2, 8, 0);
+                cv::circle(drawImgMasked, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), 2, 8, 0);
             }
             else
             {
-                rectangle(mask, cv::Point(trackerStatus[i].maskCenter.x - size, 0), cv::Point(trackerStatus[i].maskCenter.x + size, image.rows), cv::Scalar(255, 0, 0), -1);
-                rectangle(drawImg, cv::Point(trackerStatus[i].maskCenter.x - size, 0), cv::Point(trackerStatus[i].maskCenter.x + size, image.rows), cv::Scalar(255, 0, 0), 3);
-                rectangle(drawImgMasked, cv::Point(trackerStatus[i].maskCenter.x - size, 0), cv::Point(trackerStatus[i].maskCenter.x + size, image.rows), cv::Scalar(255, 0, 0), 3);
+                rectangle(mask,
+                          cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0),
+                          cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, image.rows),
+                          cv::Scalar(255, 0, 0),
+                          -1);
+                rectangle(drawImg,
+                          cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0),
+                          cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, image.rows),
+                          cv::Scalar(255, 0, 0),
+                          3);
+                rectangle(drawImgMasked,
+                          cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0),
+                          cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, image.rows),
+                          cv::Scalar(255, 0, 0),
+                          3);
             }
         }
 
