@@ -328,6 +328,8 @@ void Tracker::CameraLoop()
             img.copyTo(drawImg);
             cv::putText(drawImg, std::to_string((int)(fps + (0.5))), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
             cv::putText(drawImg, resolution, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
+            cv::line(drawImg, cv::Point(img.cols/2, 0), cv::Point(img.cols/2, img.rows), cv::Scalar(0, 0, 255));
+            cv::line(drawImg, cv::Point(0, img.rows/2), cv::Point(img.cols, img.rows/2), cv::Scalar(0, 0, 255));
             if (previewCameraCalibration)
             {
                 cv::Mat *outImg = new cv::Mat();
