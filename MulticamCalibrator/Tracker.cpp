@@ -1690,7 +1690,7 @@ void Tracker::MainLoop1()
                     calibratorPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                     calibratorTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
-                    if (calibratorPoints1.size() > 600 && calibratorPoints2.size() > 600)
+                    if (calibratorPoints1.size() > 3000 && calibratorPoints2.size() > 3000)
                     {
                         cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                         wtranslation2 = wtranslation * wtranslation2;
@@ -1710,9 +1710,9 @@ void Tracker::MainLoop1()
                         parameters->calibOffsetX2 = 100 * wtranslation2.at<double>(0, 3);
                         parameters->calibOffsetY2 = 100 * wtranslation2.at<double>(1, 3);
                         parameters->calibOffsetZ2 = 100 * wtranslation2.at<double>(2, 3);
-                        parameters->calibOffsetA2 = 57.29577 * eulerAngles.x;
-                        parameters->calibOffsetB2 = 57.29577 * eulerAngles.y;
-                        parameters->calibOffsetC2 = 57.29577 * eulerAngles.z;
+                        parameters->calibOffsetA2 = -(180.0/M_PI) * eulerAngles.z;
+                        parameters->calibOffsetB2 = -(180.0/M_PI) * eulerAngles.x;
+                        parameters->calibOffsetC2 = (180.0/M_PI) * eulerAngles.y;
                         parameters->Save();
 
                         calibratorProjected1.clear();
@@ -1731,6 +1731,8 @@ void Tracker::MainLoop1()
             {
                 for (int i = 0; i < calibratorProjected1.size(); ++i)
                 {
+                    if (i % 10 != 0)
+                        continue;
                     const auto& position = calibratorProjected1[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(0, 255, 255), 2, 8, 0);
                     cv::circle(drawImgMasked, position, 5, cv::Scalar(0, 255, 255), 2, 8, 0);
@@ -1741,6 +1743,8 @@ void Tracker::MainLoop1()
             {
                 for (int i = 0; i < calibratorReprojected1.size(); ++i)
                 {
+                    if (i % 10 != 0)
+                        continue;
                     const auto& position = calibratorReprojected1[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(255, 0, 127), 2, 8, 0);
                     cv::circle(drawImgMasked, position, 5, cv::Scalar(255, 0, 127), 2, 8, 0);
@@ -2251,7 +2255,7 @@ void Tracker::MainLoop2()
                     calibratorPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                     calibratorTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
-                    if (calibratorPoints1.size() > 600 && calibratorPoints2.size() > 600)
+                    if (calibratorPoints1.size() > 3000 && calibratorPoints2.size() > 3000)
                     {
                         cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                         wtranslation2 = wtranslation * wtranslation2;
@@ -2271,9 +2275,9 @@ void Tracker::MainLoop2()
                         parameters->calibOffsetX2 = 100 * wtranslation2.at<double>(0, 3);
                         parameters->calibOffsetY2 = 100 * wtranslation2.at<double>(1, 3);
                         parameters->calibOffsetZ2 = 100 * wtranslation2.at<double>(2, 3);
-                        parameters->calibOffsetA2 = (180.0/M_PI) * eulerAngles.x;
-                        parameters->calibOffsetB2 = (180.0/M_PI) * eulerAngles.y;
-                        parameters->calibOffsetC2 = (180.0/M_PI) * eulerAngles.z;
+                        parameters->calibOffsetA2 = -(180.0/M_PI) * eulerAngles.z;
+                        parameters->calibOffsetB2 = -(180.0/M_PI) * eulerAngles.x;
+                        parameters->calibOffsetC2 = (180.0/M_PI) * eulerAngles.y;
                         parameters->Save();
 
                         calibratorProjected1.clear();
@@ -2292,6 +2296,8 @@ void Tracker::MainLoop2()
             {
                 for (int i = 0; i < calibratorProjected2.size(); ++i)
                 {
+                    if (i % 10 != 0)
+                        continue;
                     const auto& position = calibratorProjected2[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(0, 255, 255), 2, 8, 0);
                     cv::circle(drawImgMasked, position, 5, cv::Scalar(0, 255, 255), 2, 8, 0);
@@ -2302,6 +2308,8 @@ void Tracker::MainLoop2()
             {
                 for (int i = 0; i < calibratorReprojected2.size(); ++i)
                 {
+                    if (i % 10 != 0)
+                        continue;
                     const auto& position = calibratorReprojected2[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(255, 0, 127), 2, 8, 0);
                     cv::circle(drawImgMasked, position, 5, cv::Scalar(255, 0, 127), 2, 8, 0);
