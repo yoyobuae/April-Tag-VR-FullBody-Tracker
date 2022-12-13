@@ -26,6 +26,15 @@ struct TrackerStatus {
     int searchSize;
 };
 
+
+struct FrameData
+{
+    bool ready = false;
+    cv::Mat image;
+    clock_t captureTime;
+};
+
+
 class Connection;
 class GUI;
 class Parameters;
@@ -62,7 +71,7 @@ public:
 
 private:
     void CameraLoop();
-    void CopyFreshCameraImageTo(cv::Mat& image);
+    void CopyFreshCameraImageTo(FrameData& frame);
     void CalibrateCamera();
     void CalibrateCameraCharuco();
     void CalibrateTracker();
@@ -72,11 +81,10 @@ private:
 
     cv::VideoCapture cap;
 
-    // cameraImage and imageReady are protected by cameraImageMutex.
-    // Use CopyFreshCameraImageTo in order to get the latest camera image.
-    std::mutex cameraImageMutex;
-    cv::Mat cameraImage;
-    bool imageReady = false;
+    // cameraFrame is protected by cameraImageMutex.
+    // Use CopyFreshCameraFrameTo in order to get the latest camera frame.
+    std::mutex cameraFrameMutex;
+    FrameData cameraFrame;
 
     Parameters* parameters;
     Connection* connection;
@@ -90,8 +98,6 @@ private:
     //Quaternion
 
     //Quaternion<double> q;
-
-    clock_t last_frame_time;
 
     MyApp* parentApp;
 };

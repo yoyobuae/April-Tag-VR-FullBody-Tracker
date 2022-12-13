@@ -288,7 +288,7 @@ void Tracker::CameraLoop()
     cv::Mat img;
     cv::Mat drawImg;
     double fps = 0;
-    last_frame_time = clock();
+    clock_t last_frame_time = clock();
     bool frame_visible = false;
     int cols, rows;
 
@@ -366,15 +366,16 @@ void Tracker::CameraLoop()
                 previewShown = false;
         }
         {
-            std::lock_guard<std::mutex> lock(cameraImageMutex);
+            std::lock_guard<std::mutex> lock(cameraFrameMutex);
             // Swap avoids copying the pixel buffer. It only swaps pointers and metadata.
             // The pixel buffer from cameraImage can be reused if the size and format matches.
-            cv::swap(img, cameraImage);
-            if (img.size() != cameraImage.size() || img.flags != cameraImage.flags)
+            cv::swap(img, cameraFrame.image);
+            if (img.size() != cameraFrame.image.size() || img.flags != cameraFrame.image.flags)
             {
                 img.release();
             }
-            imageReady = true;
+            cameraFrame.ready = true;
+            cameraFrame.captureTime = last_frame_time;
         }
 
         if (!disableOpenVrApi)
@@ -404,22 +405,24 @@ void Tracker::CameraLoop()
     cap.release();
 }
 
-void Tracker::CopyFreshCameraImageTo(cv::Mat& image)
+void Tracker::CopyFreshCameraImageTo(FrameData& frame)
 {
     // Sleep happens between each iteration when the mutex is not locked.
     for (;;sleep_millis(1))
     {
-        std::lock_guard<std::mutex> lock(cameraImageMutex);
-        if (imageReady)
+        std::lock_guard<std::mutex> lock(cameraFrameMutex);
+        if (cameraFrame.ready)
         {
-            imageReady = false;
+            cameraFrame.ready = false;
+            frame.ready = true;
             // Swap metadata and pointers to pixel buffers.
-            cv::swap(image, cameraImage);
+            cv::swap(frame.image, cameraFrame.image);
             // We don't want to overwrite shared data so release the image unless we are the only user of it.
-            if (!(cameraImage.u && cameraImage.u->refcount == 1))
+            if (!(cameraFrame.image.u && cameraFrame.image.u->refcount == 1))
             {
-                cameraImage.release();
+                cameraFrame.image.release();
             }
+            frame.captureTime = cameraFrame.captureTime;
             return;
         }
     }
@@ -475,7 +478,8 @@ void Tracker::CalibrateCameraCharuco()
 {
     //function to calibrate our camera
 
-    cv::Mat image;
+    FrameData frame;
+    cv::Mat &image = frame.image;
     cv::Mat gray;
     cv::Mat drawImg;
 
@@ -521,7 +525,7 @@ void Tracker::CalibrateCameraCharuco()
     int picsTaken = 0;
     while(mainThreadRunning && cameraRunning)
     {
-        CopyFreshCameraImageTo(image);
+        CopyFreshCameraImageTo(frame);
         int cols, rows;
         if (image.cols < image.rows)
         {
@@ -762,7 +766,8 @@ void Tracker::CalibrateCamera()
     std::vector<cv::Point2f> corner_pts;
     bool success;
 
-    cv::Mat image;
+    FrameData frame;
+    cv::Mat &image = frame.image;
 
     int i = 0;
     int framesSinceLast = -100;
@@ -779,7 +784,7 @@ void Tracker::CalibrateCamera()
                            });
             return;
         }
-        CopyFreshCameraImageTo(image);
+        CopyFreshCameraImageTo(frame);
         cv::putText(image, std::to_string(i) + "/" + std::to_string(picNum), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255));
         int cols, rows;
         if (image.cols < image.rows)
@@ -983,7 +988,8 @@ void Tracker::CalibrateTracker()
         boardRvec.push_back(cv::Vec3d());
         boardTvec.push_back(cv::Vec3d());
     }
-    cv::Mat image;
+    FrameData frame;
+    cv::Mat &image = frame.image;
     cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
 
     std::vector<int> idsList;
@@ -993,7 +999,7 @@ void Tracker::CalibrateTracker()
 
     while (cameraRunning && mainThreadRunning)
     {
-        CopyFreshCameraImageTo(image);
+        CopyFreshCameraImageTo(frame);
 
         clock_t start;
         //clock for timing of detection
@@ -1188,7 +1194,9 @@ void Tracker::MainLoop()
     std::vector<cv::Point2f> centers;
 
 
-    cv::Mat image, drawImg, ycc, gray, cr;
+    FrameData frame;
+    cv::Mat &image = frame.image;
+    cv::Mat drawImg, ycc, gray, cr;
 
     cv::Mat  prevImg;
 
@@ -1294,7 +1302,7 @@ void Tracker::MainLoop()
     while (mainThreadRunning && cameraRunning)
     {
 
-        CopyFreshCameraImageTo(image);
+        CopyFreshCameraImageTo(frame);
 
         drawImg = image;
         cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
@@ -1325,10 +1333,10 @@ void Tracker::MainLoop()
         for (int i = 0; i < trackerNum; i++)
         {
 
-            double frameTime = double(clock() - last_frame_time) / double(CLOCKS_PER_SEC);
+            double frameTime = double(clock() - frame.captureTime) / double(CLOCKS_PER_SEC);
 
             std::string word;
-            std::istringstream ret = connection->Send("gettrackerpose " + std::to_string(i) + " " + std::to_string(-frameTime - parameters->camLatency));
+            std::istringstream ret = connection->Send("gettrackerpose " + std::to_string(i) + " " + std::to_string(frameTime + parameters->camLatency));
             ret >> word;
             if (word != "trackerpose")
             {
@@ -1770,8 +1778,6 @@ void Tracker::MainLoop()
             else if (factor >= 1)
                 factor = 0.99;
 
-            end = clock();
-            double frameTime = double(end - last_frame_time) / double(CLOCKS_PER_SEC);
 
 #if 0
             if (a < -1.5 || a > 1.5 || b < -0.5 || b > 2.5 || c < -1.5 || c > 1.5)
@@ -1816,6 +1822,9 @@ void Tracker::MainLoop()
             if ((current_timestamp.count() - trackerStatus[i].last_update_timestamp.count()) > 100.0)
                 continue;
 #endif
+
+            end = clock();
+            double frameTime = double(end - frame.captureTime) / double(CLOCKS_PER_SEC);
 
             //send all the values
             //frame time is how much time passed since frame was acquired.
