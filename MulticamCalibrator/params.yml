@@ -1,6 +1,6 @@
 %YAML:1.0
 ---
-markersPerTracker: 45
+markersPerTracker: 11
 arucoParams:
    cornerRefinementMethod: 0
    markerBorderBits: 1
@@ -32,41 +32,41 @@ arucoParams:
    perspectiveRemovePixelPerCell: 4
    polygonalApproxAccuracyRate: 2.9999999999999999e-02
 cameraAddr1: "2"
-cameraAddr2: "4"
+cameraAddr2: "3"
 cameraApiPreference1: 1800
 cameraApiPreference2: 1800
 camFps1: 30
 camFps2: 30
-camHeight1: 960
+camHeight1: 1080
 camHeight2: 1080
-camWidth1: 1280
+camWidth1: 1920
 camWidth2: 1920
 cameraMatrix1: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ 1.4041330936676545e+03, 0., 6.4509290982674452e+02, 0.,
-       1.4042831148801279e+03, 4.7895072657957860e+02, 0., 0., 1. ]
+   data: [ 1.0939230306416885e+03, 0., 5.1621836701366772e+02, 0.,
+       1.0861747639240268e+03, 9.0569274129069720e+02, 0., 0., 1. ]
 cameraMatrix2: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ 1.0939230306416885e+03, 0., 5.1621836701366772e+02, 0.,
-       1.0861747639240268e+03, 9.0569274129069720e+02, 0., 0., 1. ]
+   data: [ 1.1143307930932663e+03, 0., 5.6504343225072785e+02, 0.,
+       1.1059205433385837e+03, 9.3644363084324084e+02, 0., 0., 1. ]
 distortionCoeffs1: !!opencv-matrix
-   rows: 1
-   cols: 5
-   dt: d
-   data: [ -2.2713184947603049e-02, 9.8308334943255460e-01,
-       7.2283643368449275e-04, 3.1740940216926468e-04,
-       -3.1788127864850044e+00 ]
-distortionCoeffs2: !!opencv-matrix
    rows: 1
    cols: 5
    dt: d
    data: [ 1.2739972531828964e-01, -1.9913630925913986e-01,
        -2.0653653558829277e-04, 2.9361362302479192e-05,
        8.5147049965819663e-02 ]
+distortionCoeffs2: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: d
+   data: [ 1.4267601598884411e-01, -2.3806806591951565e-01,
+       -1.8342109338194960e-04, 1.1732587517654988e-04,
+       1.1711709740346814e-01 ]
 stdDeviationsIntrinsics1: !!opencv-matrix
    rows: 18
    cols: 1
@@ -4434,27 +4434,27 @@ trackerNum: 1
 markerSize: 2.5000000000000001e-02
 numOfPrevValues: 1
 quadDecimate: 1.5000000000000000e+00
-searchWindow1: 1.0000000000000001e-01
+searchWindow1: 7.0000000000000007e-02
 searchWindow2: 7.0000000000000007e-02
 usePredictive: 1
 calibrationTracker: 0
-rotateCl1: 0
+rotateCl1: 1
 rotateCl2: 1
 rotateCounterCl1: 0
 rotateCounterCl2: 0
 coloredMarkers: 1
 calibOffsetX1: 0.
-calibOffsetX2: 7.2303965235497031e+01
+calibOffsetX2: 4.8270572671011552e-01
 calibOffsetY1: 0.
-calibOffsetY2: 1.5388638975447418e+02
+calibOffsetY2: 1.5610648033707415e+02
 calibOffsetZ1: 0.
-calibOffsetZ2: 7.9103201252887018e+01
+calibOffsetZ2: -1.5571502254861852e+02
 calibOffsetA1: 0.
-calibOffsetA2: 1.6000747755997992e+02
+calibOffsetA2: 1.5840343306294827e+02
 calibOffsetB1: 0.
-calibOffsetB2: 4.1494795536988264e+01
+calibOffsetB2: 1.6721141584493486e+02
 calibOffsetC1: 0.
-calibOffsetC2: -8.3041636184371281e-01
+calibOffsetC2: 1.4752933870049199e+00
 circularWindow: 1
 smoothingFactor: 5.0000000000000000e-01
 ignoreTracker0: 0
@@ -4462,31 +4462,34 @@ wtranslation1: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [ 1., 0., 0., 0., 0., -9.9999982118606567e-01,
-       -5.9262110153213143e-04, 1.2500000000000000e+00, 0.,
-       5.9262110153213143e-04, -9.9999982118606567e-01,
-       1.2500000000000000e+00, 0., 0., 0., 1. ]
+   data: [ 7.3877438803905759e-01, 2.4388809600117420e-01,
+       -6.2827744634722571e-01, 7.3070419293580158e-01,
+       1.2481242026430412e-02, -9.3701754989224284e-01,
+       -3.4906005925441214e-01, 1.5671297674784208e+00,
+       -6.7383876230988560e-01, 2.5003433773550454e-01,
+       -6.9528819386662799e-01, 8.0621332571967963e-01, 0., 0., 0., 1. ]
 wtranslation2: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [ 7.4893735667822392e-01, 2.1632346281851902e-01,
-       -6.2633674978074316e-01, 7.2303965235497025e-01,
-       -1.4492998218149158e-02, -9.3963893828388445e-01,
-       -3.4186124190500333e-01, 1.5388638975447417e+00,
-       -6.6248269203980503e-01, 2.6511028050366409e-01,
-       -7.0059531634179539e-01, 7.9103201252887023e-01, 0., 0., 0., 1. ]
+   data: [ -9.7487012695482156e-01, 1.0481815415371024e-01,
+       -1.9657379265258967e-01, 4.8270572671011555e-03,
+       -2.5745881823769950e-02, -9.2949032874685211e-01,
+       -3.6794683270346473e-01, 1.5610648033707415e+00,
+       -2.2128080486640950e-01, -3.5363937687751007e-01,
+       9.0883119790813582e-01, -1.5571502254861853e+00, 0., 0., 0., 1. ]
 wrotation1: !!opencv-matrix
    rows: 4
    cols: 1
    dt: d
-   data: [ 2.9900997836708714e-04, 9.9999995529651542e-01, 0., 0. ]
+   data: [ 1.6314766645602594e-01, 9.1802507207019246e-01,
+       6.9814496946063356e-02, -3.5459659050340475e-01 ]
 wrotation2: !!opencv-matrix
    rows: 4
    cols: 1
    dt: d
-   data: [ 1.6485076740232674e-01, 9.2048514535867232e-01,
-       5.4815648722985631e-02, -3.5003794982253900e-01 ]
+   data: [ -3.3431804492361918e-02, -1.0699182665500054e-01,
+       -1.8476241521196460e-01, 9.7636976264243891e-01 ]
 cameraSettings1: 0
 cameraSettings2: 0
 chessboardCalib: 0
