@@ -366,7 +366,7 @@ void Tracker::CameraLoop()
                 previewShown = false;
         }
         {
-            std::lock_guard<std::mutex> lock(cameraFrameMutex);
+            std::unique_lock<std::mutex> lock(cameraFrameMutex);
             // Swap avoids copying the pixel buffer. It only swaps pointers and metadata.
             // The pixel buffer from cameraImage can be reused if the size and format matches.
             cv::swap(img, cameraFrame.image);
@@ -378,6 +378,7 @@ void Tracker::CameraLoop()
             cameraFrame.captureTime = last_frame_time;
             cameraFrame.swapTime = clock();
         }
+        cameraFrameCondVar.notify_one();
 
         if (!disableOpenVrApi)
         {
@@ -408,11 +409,12 @@ void Tracker::CameraLoop()
 
 void Tracker::CopyFreshCameraImageTo(FrameData& frame)
 {
-    // Sleep happens between each iteration when the mutex is not locked.
-    for (;;sleep_millis(1))
     {
-        std::lock_guard<std::mutex> lock(cameraFrameMutex);
-        if (cameraFrame.ready)
+        std::unique_lock<std::mutex> lock(cameraFrameMutex);
+        if (!cameraFrame.ready)
+        {
+            cameraFrameCondVar.wait(lock, [&]{ return cameraFrame.ready; });
+        }
         {
             cameraFrame.ready = false;
             frame.ready = true;

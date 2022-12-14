@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <chrono>
+#include <condition_variable>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -91,6 +92,7 @@ private:
     // cameraFrame is protected by cameraImageMutex.
     // Use CopyFreshCameraFrameTo in order to get the latest camera frame.
     std::mutex cameraFrameMutex;
+    std::condition_variable cameraFrameCondVar;
     FrameData cameraFrame;
 
     Parameters* parameters;
