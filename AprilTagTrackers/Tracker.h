@@ -32,6 +32,12 @@ struct FrameData
     bool ready = false;
     cv::Mat image;
     clock_t captureTime;
+    clock_t swapTime;
+    clock_t copyFreshTime;
+    clock_t getPoseTime;
+    clock_t doMaskTime;
+    clock_t detectTime;
+    clock_t sendTrackerTime;
 };
 
 
@@ -60,6 +66,7 @@ public:
     bool disableOut = false;
     bool disableOpenVrApi = true;
     bool privacyMode = false;
+    bool showTimingStats = true;
     int messageDialogResponse = wxID_CANCEL;
 
     GUI* gui;
@@ -94,6 +101,9 @@ private:
 
     std::vector<cv::Ptr<cv::aruco::Board>> trackers;
     bool trackersCalibrated = false;
+
+    cv::Mat statsImg = cv::Mat(1000, 2000, CV_8UC3, cv::Scalar(0, 0, 0));
+    int statsCurX = 0;
 
     //Quaternion
 

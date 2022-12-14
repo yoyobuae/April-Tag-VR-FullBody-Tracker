@@ -376,6 +376,7 @@ void Tracker::CameraLoop()
             }
             cameraFrame.ready = true;
             cameraFrame.captureTime = last_frame_time;
+            cameraFrame.swapTime = clock();
         }
 
         if (!disableOpenVrApi)
@@ -423,6 +424,8 @@ void Tracker::CopyFreshCameraImageTo(FrameData& frame)
                 cameraFrame.image.release();
             }
             frame.captureTime = cameraFrame.captureTime;
+            frame.swapTime = cameraFrame.swapTime;
+            frame.copyFreshTime = clock();
             return;
         }
     }
@@ -1437,6 +1440,8 @@ void Tracker::MainLoop()
 
         }
 
+        frame.getPoseTime = clock();
+
         //Then define your mask image
         cv::Mat mask = cv::Mat::zeros(gray.size(), gray.type());
 
@@ -1485,6 +1490,8 @@ void Tracker::MainLoop()
             gray.copyTo(dstImage, mask);
             gray = dstImage;
         }
+
+        frame.doMaskTime = clock();
 
         //cv::imshow("test", image);
 
@@ -1639,6 +1646,8 @@ void Tracker::MainLoop()
             calibControllerLastPress = clock();
         }
         april.detectMarkers(gray, &corners, &ids, &centers, trackers);
+        frame.detectTime = clock();
+
         std::chrono::milliseconds current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
         for (int i = 0; i < trackerNum; ++i) {
 
@@ -1899,6 +1908,8 @@ void Tracker::MainLoop()
 
         }
 
+        frame.sendTrackerTime = clock();
+
         {
             cv::Mat mask = cv::Mat::zeros(image.size(), image.type());
 
@@ -1922,6 +1933,43 @@ void Tracker::MainLoop()
 
         end = clock();
         double frameTime = double(end - start) / double(CLOCKS_PER_SEC);
+
+        if (showTimingStats)
+        {
+            cv::Mat *outImg = new cv::Mat();
+
+            int frameWriteMsecs = int(20000.0 * double(frame.swapTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+            int frameReadMsecs = int(20000.0 * double(frame.copyFreshTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+            int getPoseMsecs = int(20000.0 * double(frame.getPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+            int doMaskMsecs = int(20000.0 * double(frame.doMaskTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+            int detectMsecs = int(20000.0 * double(frame.detectTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+            int sendTrackerMsecs = int(20000.0 * double(frame.sendTrackerTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+
+            rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows), cv::Scalar(0, 0, 0), -1);                        // Clear
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs), cv::Scalar(133, 178, 208), -1);// Light Brown
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs), cv::Scalar(23, 73, 207), -1);   // Orange
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);     // Green
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - detectMsecs),      cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
+
+            if (statsCurX % 20 > 15) {
+                for (int y = 99 ; y < 1000; y += 100) {
+                    rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - y),  cv::Point(statsCurX + 2, statsImg.rows - y + 2), cv::Scalar(0, 0, 0), -1);
+                }
+            }
+
+            statsCurX += 3;
+            statsCurX = (statsCurX >= 2000) ? 0 : statsCurX;
+
+            statsImg.copyTo(*outImg);
+            gui->CallAfter([outImg] ()
+                           {
+                           cv::imshow("stats", *outImg);
+                           cv::waitKey(1);
+                           delete(outImg);
+                           });
+        }
 
         if (!disableOut)
         {
@@ -1959,5 +2007,9 @@ void Tracker::MainLoop()
     gui->CallAfter([] ()
                    {
                    cv::destroyWindow("out");
+                   });
+    gui->CallAfter([] ()
+                   {
+                   cv::destroyWindow("stats");
                    });
 }
