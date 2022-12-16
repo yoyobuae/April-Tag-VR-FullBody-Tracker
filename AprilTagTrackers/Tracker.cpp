@@ -1332,6 +1332,8 @@ void Tracker::MainLoop()
         cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
         april.convertToSingleChannel(image, gray);
 
+        frame.toGrayTime = clock();
+
         clock_t start, end;
         //for timing our detection
         start = clock();
@@ -1390,6 +1392,7 @@ void Tracker::MainLoop()
             }
         }
 
+        frame.getPoseTime = clock();
 
         for (int i = 0; i < trackerNum; i++)
         {
@@ -1478,7 +1481,7 @@ void Tracker::MainLoop()
 
         }
 
-        frame.getPoseTime = clock();
+        frame.processPoseTime = clock();
 
         //Then define your mask image
         cv::Mat mask = cv::Mat::zeros(gray.size(), gray.type());
@@ -2027,7 +2030,9 @@ void Tracker::MainLoop()
 
             int frameWriteMsecs = int(20000.0 * double(frame.swapTime - frame.captureTime) / double(CLOCKS_PER_SEC));
             int frameReadMsecs = int(20000.0 * double(frame.copyFreshTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+            int toGrayMsecs = int(20000.0 * double(frame.toGrayTime - frame.captureTime) / double(CLOCKS_PER_SEC));
             int getPoseMsecs = int(20000.0 * double(frame.getPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+            int processPoseMsecs = int(20000.0 * double(frame.processPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
             int doMaskMsecs = int(20000.0 * double(frame.doMaskTime - frame.captureTime) / double(CLOCKS_PER_SEC));
             int detectMsecs = int(20000.0 * double(frame.detectTime - frame.captureTime) / double(CLOCKS_PER_SEC));
             int sendTrackerMsecs = int(20000.0 * double(frame.sendTrackerTime - frame.captureTime) / double(CLOCKS_PER_SEC));
@@ -2035,8 +2040,10 @@ void Tracker::MainLoop()
             rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows), cv::Scalar(0, 0, 0), -1);                        // Clear
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs), cv::Scalar(133, 178, 208), -1);// Light Brown
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs), cv::Scalar(23, 73, 207), -1);   // Orange
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs), cv::Scalar(140, 117, 45), -1);     // Blue
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs), cv::Scalar(51, 140, 117), -1);    // Green
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs), cv::Scalar(20, 89, 152), -1); // Brown
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);     // Green
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - detectMsecs),      cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
 

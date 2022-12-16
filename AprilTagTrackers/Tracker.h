@@ -39,7 +39,9 @@ struct FrameData
     clock_t captureTime;
     clock_t swapTime;
     clock_t copyFreshTime;
+    clock_t toGrayTime;
     clock_t getPoseTime;
+    clock_t processPoseTime;
     clock_t doMaskTime;
     clock_t detectTime;
     clock_t sendTrackerTime;
