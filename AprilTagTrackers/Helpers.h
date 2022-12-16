@@ -20,3 +20,6 @@ cv::Vec3f rotationMatrixToEulerAngles(cv::Mat& R);
 Quaternion<double> mRot2Quat(const cv::Mat& m);
 cv::Mat getSpaceCalibEuler(cv::Vec3d rvec, cv::Vec3d tvec, double xOffset, double yOffset, double zOffset);
 cv::Vec3d quat2rodr(double qw, double qx, double qy, double qz);
+void circleOnPostRotatedImg(cv::Mat &img, cv::Point center, int radius, const cv::Scalar &color, int rotate = -1, int thickness = 1, int lineType = cv::LINE_8, int shift = 0);
+void rectangleOnPostRotatedImg(cv::Mat &img, cv::Point pt1, cv::Point pt2, const cv::Scalar &color, int rotate = -1, int thickness = 1, int lineType = cv::LINE_8, int shift = 0);
+void drawAxisOnPostRotatedImg(cv::Mat &img, cv::Mat &camMat, cv::Mat &distCoeffs, cv::Vec3d &rvec, cv::Vec3d &tvec, float length, int rotate);

@@ -107,6 +107,9 @@ private:
     cv::Mat statsImg = cv::Mat(1000, 2000, CV_8UC3, cv::Scalar(0, 0, 0));
     int statsCurX = 0;
 
+    bool rotate = false;
+    int rotateFlag = -1;
+
     //Quaternion
 
     //Quaternion<double> q;

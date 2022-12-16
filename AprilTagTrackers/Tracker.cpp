@@ -268,8 +268,6 @@ void Tracker::StartCamera(std::string id, int apiPreference)
 void Tracker::CameraLoop()
 {
     bool previewShown = false;
-    bool rotate = false;
-    int rotateFlag = -1;
     if (parameters->rotateCl && parameters->rotateCounterCl)
     {
         rotate = true;
@@ -308,10 +306,6 @@ void Tracker::CameraLoop()
         clock_t curtime = clock();
         fps = 0.95*fps + 0.05/(double(curtime - last_frame_time) / double(CLOCKS_PER_SEC));
         last_frame_time = curtime;        
-        if (rotate)
-        {
-            cv::rotate(img, img, rotateFlag);
-        }
         std::string resolution = std::to_string(img.cols) + "x" + std::to_string(img.rows);
         if (previewCamera || previewCameraCalibration)
         {
@@ -531,6 +525,10 @@ void Tracker::CalibrateCameraCharuco()
     while(mainThreadRunning && cameraRunning)
     {
         CopyFreshCameraImageTo(frame);
+        if (rotate)
+        {
+            cv::rotate(image, image, rotateFlag);
+        }
         int cols, rows;
         if (image.cols < image.rows)
         {
@@ -790,6 +788,10 @@ void Tracker::CalibrateCamera()
             return;
         }
         CopyFreshCameraImageTo(frame);
+        if (rotate)
+        {
+            cv::rotate(image, image, rotateFlag);
+        }
         cv::putText(image, std::to_string(i) + "/" + std::to_string(picNum), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255));
         int cols, rows;
         if (image.cols < image.rows)
@@ -1005,6 +1007,10 @@ void Tracker::CalibrateTracker()
     while (cameraRunning && mainThreadRunning)
     {
         CopyFreshCameraImageTo(frame);
+        if (rotate)
+        {
+            cv::rotate(image, image, rotateFlag);
+        }
 
         clock_t start;
         //clock for timing of detection
@@ -1309,6 +1315,19 @@ void Tracker::MainLoop()
 
         CopyFreshCameraImageTo(frame);
 
+        int rotated_cols = image.cols;
+        int rotated_rows = image.rows;
+        switch (rotateFlag) {
+        case cv::ROTATE_180:
+            // Do nothing
+            break;
+        case cv::ROTATE_90_CLOCKWISE:
+        case cv::ROTATE_90_COUNTERCLOCKWISE:
+            rotated_cols = image.rows;
+            rotated_rows = image.cols;
+            break;
+        }
+
         drawImg = image;
         cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
         april.convertToSingleChannel(image, gray);
@@ -1401,12 +1420,12 @@ void Tracker::MainLoop()
             cv::projectPoints(point, identity_rvec, identity_tvec, parameters->camMat, parameters->distCoeffs, projected);
 
 
-            cv::circle(drawImg, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
-            cv::circle(drawImgMasked, projected[0], 5, cv::Scalar(0, 0, 255), 2, 8, 0);
-            cv::circle(drawImg, projected[2], 5, cv::Scalar(0, 255, 255), 2, 8, 0);
-            cv::circle(drawImgMasked, projected[2], 5, cv::Scalar(0, 255, 255), 2, 8, 0);
-            cv::circle(drawImg, projected[3], 5, cv::Scalar(255, 0, 255), 2, 8, 0);
-            cv::circle(drawImgMasked, projected[3], 5, cv::Scalar(255, 0, 255), 2, 8, 0);
+            circleOnPostRotatedImg(drawImg, projected[0], 5, cv::Scalar(0, 0, 255), rotateFlag, 2, 8, 0);
+            circleOnPostRotatedImg(drawImgMasked, projected[0], 5, cv::Scalar(0, 0, 255), rotateFlag, 2, 8, 0);
+            circleOnPostRotatedImg(drawImg, projected[2], 5, cv::Scalar(0, 255, 255), rotateFlag, 2, 8, 0);
+            circleOnPostRotatedImg(drawImgMasked, projected[2], 5, cv::Scalar(0, 255, 255), rotateFlag, 2, 8, 0);
+            circleOnPostRotatedImg(drawImg, projected[3], 5, cv::Scalar(255, 0, 255), rotateFlag, 2, 8, 0);
+            circleOnPostRotatedImg(drawImgMasked, projected[3], 5, cv::Scalar(255, 0, 255), rotateFlag, 2, 8, 0);
 
             if (tracker_pose_valid[i] == 0)
             {
@@ -1454,7 +1473,7 @@ void Tracker::MainLoop()
         //I assume you want to draw the circle at the center of your image, with a radius of 50
         for (int i = 0; i < trackerNum; i++)
         {
-            if (trackerStatus[i].maskCenter.x <= 0 || trackerStatus[i].maskCenter.y <= 0 || trackerStatus[i].maskCenter.x >= image.cols || trackerStatus[i].maskCenter.y >= image.rows)
+            if (trackerStatus[i].maskCenter.x <= 0 || trackerStatus[i].maskCenter.y <= 0 || trackerStatus[i].maskCenter.x >= rotated_cols || trackerStatus[i].maskCenter.y >= rotated_rows)
             {
                 trackerStatus[i].boardFound = false;    //if detected tracker is out of view of the camera, we mark it as not found, as either the prediction is wrong or we wont see it anyway
                 continue;
@@ -1462,27 +1481,18 @@ void Tracker::MainLoop()
             doMasking = true;
             if (circularWindow)
             {
-                cv::circle(mask, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), -1, 8, 0);
-                cv::circle(drawImg, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), 2, 8, 0);
-                cv::circle(drawImgMasked, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), 2, 8, 0);
+                circleOnPostRotatedImg(mask, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, -1, 8, 0);
+                circleOnPostRotatedImg(drawImg, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
+                circleOnPostRotatedImg(drawImgMasked, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
             }
             else
             {
-                rectangle(mask,
-                          cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0),
-                          cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, image.rows),
-                          cv::Scalar(255, 0, 0),
-                          -1);
-                rectangle(drawImg,
-                          cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0),
-                          cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, image.rows),
-                          cv::Scalar(255, 0, 0),
-                          3);
-                rectangle(drawImgMasked,
-                          cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0),
-                          cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, image.rows),
-                          cv::Scalar(255, 0, 0),
-                          3);
+                cv::Point topLeft = cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0);
+                cv::Point bottomRight = cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, rotated_rows);
+
+                rectangleOnPostRotatedImg(mask, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, -1);
+                rectangleOnPostRotatedImg(drawImg, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
+                rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, rotateFlag, 0), 3);
             }
         }
 
@@ -1650,6 +1660,44 @@ void Tracker::MainLoop()
         april.detectMarkers(gray, &corners, &ids, &centers, trackers);
         frame.detectTime = clock();
 
+        for (int i = 0; i < corners.size(); i++) {
+            for (int j = 0; j < corners[i].size(); j++) {
+                auto tmp = corners[i][j].x;
+                switch (rotateFlag) {
+                case cv::ROTATE_180:
+                    corners[i][j].x = rotated_cols - corners[i][j].x;
+                    corners[i][j].y = rotated_rows - corners[i][j].y;
+                    break;
+                case cv::ROTATE_90_CLOCKWISE:
+                    corners[i][j].x = rotated_cols - corners[i][j].y;
+                    corners[i][j].y = tmp;
+                    break;
+                case cv::ROTATE_90_COUNTERCLOCKWISE:
+                    corners[i][j].x = corners[i][j].y;
+                    corners[i][j].y = rotated_rows - tmp;
+                    break;
+                }
+            }
+        }
+
+        for (int i = 0; i < centers.size(); i++) {
+            auto tmp = centers[i].x;
+            switch (rotateFlag) {
+            case cv::ROTATE_180:
+                centers[i].x = rotated_cols - centers[i].x;
+                centers[i].y = rotated_rows - centers[i].y;
+                break;
+            case cv::ROTATE_90_CLOCKWISE:
+                centers[i].x = rotated_cols - centers[i].y;
+                centers[i].y = tmp;
+                break;
+            case cv::ROTATE_90_COUNTERCLOCKWISE:
+                centers[i].x = centers[i].y;
+                centers[i].y = rotated_rows - tmp;
+                break;
+            }
+        }
+
         std::chrono::milliseconds current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
         for (int i = 0; i < trackerNum; ++i) {
 
@@ -1772,8 +1820,8 @@ void Tracker::MainLoop()
             //convert rodriguez rotation to quaternion
             Quaternion<double> q = rodr2quat(trackerStatus[i].boardRvec[0], trackerStatus[i].boardRvec[1], trackerStatus[i].boardRvec[2]);
 
-            cv::aruco::drawAxis(drawImg, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05);
-            cv::aruco::drawAxis(drawImgMasked, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05);
+            drawAxisOnPostRotatedImg(drawImg, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05, rotateFlag);
+            drawAxisOnPostRotatedImg(drawImgMasked, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05, rotateFlag);
 
             q = Quaternion<double>(0, 0, 1, 0) * (wrotation * q) * Quaternion<double>(0, 0, 1, 0);
 
@@ -1805,9 +1853,9 @@ void Tracker::MainLoop()
             }
 
             // Figure out the camera aspect ratio, XZ and YZ ratio limits
-            double aspectRatio = (double)image.cols/(double)image.rows;
-            double XZratioLimit = 0.5*(double)image.cols/parameters->camMat.at<double>(0,0);
-            double YZratioLimit = 0.5*(double)image.rows/parameters->camMat.at<double>(1,1);
+            double aspectRatio = (double)rotated_cols/(double)rotated_rows;
+            double XZratioLimit = 0.5*(double)rotated_cols/parameters->camMat.at<double>(0,0);
+            double YZratioLimit = 0.5*(double)rotated_rows/parameters->camMat.at<double>(1,1);
 
             // Figure out which dimension is most likely to go outside the camera field of view
             if (abs(trackerStatus[i].boardTvec[0]/trackerStatus[i].boardTvec[1]) > aspectRatio)
@@ -1912,6 +1960,26 @@ void Tracker::MainLoop()
 
         frame.sendTrackerTime = clock();
 
+        for (int i = 0; i < corners.size(); i++) {
+            for (int j = 0; j < corners[i].size(); j++) {
+                auto tmp = corners[i][j].x;
+                switch (rotateFlag) {
+                case cv::ROTATE_180:
+                    corners[i][j].x = image.cols - corners[i][j].x;
+                    corners[i][j].y = image.rows - corners[i][j].y;
+                    break;
+                case cv::ROTATE_90_CLOCKWISE:
+                    corners[i][j].x = corners[i][j].y;
+                    corners[i][j].y = image.rows - tmp;
+                    break;
+                case cv::ROTATE_90_COUNTERCLOCKWISE:
+                    corners[i][j].x = image.cols - corners[i][j].y;
+                    corners[i][j].y = tmp;
+                    break;
+                }
+            }
+        }
+
         {
             cv::Mat mask = cv::Mat::zeros(image.size(), image.type());
 
@@ -1997,8 +2065,12 @@ void Tracker::MainLoop()
                 april.drawTimeProfile(*outImg, cv::Point(10, 60));
             }            
             
-            gui->CallAfter([outImg] ()
+            gui->CallAfter([outImg, this] ()
                            {
+                           if (this->rotate)
+                           {
+                           cv::rotate(*outImg, *outImg, this->rotateFlag);
+                           }
                            cv::imshow("out", *outImg);
                            cv::waitKey(1);
                            delete(outImg);

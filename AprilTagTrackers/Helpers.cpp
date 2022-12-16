@@ -390,3 +390,94 @@ Quaternion<double> mRot2Quat(const cv::Mat& m) {
 
     return q;
 }
+
+void circleOnPostRotatedImg(cv::Mat &img, cv::Point center, int radius, const cv::Scalar &color, int rotate, int thickness, int lineType, int shift)
+{
+    cv::Point newCenter = center;
+    switch (rotate) {
+    case cv::ROTATE_180:
+        newCenter.x = img.cols - center.x;
+        newCenter.y = img.rows - center.y;
+        break;
+    case cv::ROTATE_90_CLOCKWISE:
+        newCenter.x = center.y;
+        newCenter.y = img.rows - center.x;
+        break;
+    case cv::ROTATE_90_COUNTERCLOCKWISE:
+        newCenter.x = img.cols - center.y;
+        newCenter.y = center.x;
+        break;
+    }
+    cv::circle(img, newCenter, radius, color, thickness, lineType, shift);
+}
+
+void rectangleOnPostRotatedImg(cv::Mat &img, cv::Point pt1, cv::Point pt2, const cv::Scalar &color, int rotate, int thickness, int lineType, int shift)
+{
+    cv::Point newpt1 = pt1;
+    cv::Point newpt2 = pt2;
+    switch (rotate) {
+    case cv::ROTATE_180:
+        newpt1.x = img.cols - pt1.x;
+        newpt1.y = img.rows - pt1.y;
+        newpt2.x = img.cols - pt2.x;
+        newpt2.y = img.rows - pt2.y;
+        break;
+    case cv::ROTATE_90_CLOCKWISE:
+        newpt1.x = pt1.y;
+        newpt1.y = img.rows - pt1.x;
+        newpt2.x = pt2.y;
+        newpt2.y = img.rows - pt2.x;
+        break;
+    case cv::ROTATE_90_COUNTERCLOCKWISE:
+        newpt1.x = img.cols - pt1.y;
+        newpt1.y = pt1.x;
+        newpt2.x = img.cols - pt2.y;
+        newpt2.y = pt2.x;
+        break;
+    }
+    cv::rectangle(img, newpt1, newpt2, color, thickness, lineType, shift);
+}
+
+void drawAxisOnPostRotatedImg(cv::Mat &img, cv::Mat &camMat, cv::Mat &distCoeffs, cv::Vec3d &rvec, cv::Vec3d &tvec, float length, int rotate = -1)
+{
+    cv::Vec3d newRvec = rvec;
+    cv::Vec3d newTvec = tvec;
+    cv::Mat rvecMat, rrotMat;
+    cv::Mat newCamMat = camMat.clone();
+    cv::Mat newDistCoeffs = distCoeffs.clone();
+    switch (rotate) {
+    case cv::ROTATE_180:
+        cv::Rodrigues(cv::Vec3d(0.0, 0.0, M_PI), rrotMat);
+        break;
+    case cv::ROTATE_90_CLOCKWISE:
+        cv::Rodrigues(cv::Vec3d(0.0, 0.0, -M_PI/2), rrotMat);
+        newCamMat.at<double>(0,0) = camMat.at<double>(1,1);
+        newCamMat.at<double>(1,1) = camMat.at<double>(0,0);
+        newCamMat.at<double>(0,2) = camMat.at<double>(1,2);
+        newCamMat.at<double>(1,2) = camMat.at<double>(0,2);
+        newDistCoeffs.at<double>(0,2) = distCoeffs.at<double>(0,3);
+        newDistCoeffs.at<double>(0,3) = distCoeffs.at<double>(0,2);
+        break;
+    case cv::ROTATE_90_COUNTERCLOCKWISE:
+        cv::Rodrigues(cv::Vec3d(0.0, 0.0, M_PI/2), rrotMat);
+        newCamMat.at<double>(0,0) = camMat.at<double>(1,1);
+        newCamMat.at<double>(1,1) = camMat.at<double>(0,0);
+        newCamMat.at<double>(0,2) = camMat.at<double>(1,2);
+        newCamMat.at<double>(1,2) = camMat.at<double>(0,2);
+        newDistCoeffs.at<double>(0,2) = distCoeffs.at<double>(0,3);
+        newDistCoeffs.at<double>(0,3) = distCoeffs.at<double>(0,2);
+        break;
+    }
+    if (rotate >= 0) {
+        cv::Rodrigues(rvec, rvecMat);
+        rvecMat = rrotMat * rvecMat;
+        cv::Rodrigues(rvecMat, newRvec);
+        cv::Mat tmp = cv::Mat_<double>(3, 1);
+        tmp.at<double>(0, 0) = tvec[0];
+        tmp.at<double>(1, 0) = tvec[1];
+        tmp.at<double>(2, 0) = tvec[2];
+        tmp = rrotMat * tmp;
+        newTvec = cv::Vec3d(tmp.at<double>(0, 0), tmp.at<double>(1, 0), tmp.at<double>(2, 0));
+    }
+    cv::aruco::drawAxis(img, newCamMat, newDistCoeffs, newRvec, newTvec, length);
+}
