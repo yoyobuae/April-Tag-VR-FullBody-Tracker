@@ -25,6 +25,10 @@ struct TrackerStatus {
     cv::Point2d maskCenter;
     std::chrono::milliseconds last_update_timestamp;
     int searchSize;
+    int pose_valid;
+    int idx;
+    double a, b, c;
+    double qw, qx, qy, qz;
 };
 
 

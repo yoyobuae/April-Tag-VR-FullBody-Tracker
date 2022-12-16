@@ -1339,7 +1339,10 @@ void Tracker::MainLoop()
         bool circularWindow = parameters->circularWindow;
 
         //last is if pose is valid: 0 is valid, 1 is late (hasnt been updated for more than 0.2 secs), -1 means invalid and is only zeros
-        std::vector<int> tracker_pose_valid = std::vector<int>(trackerNum, -1);
+        for (int i = 0; i < trackerNum; i++)
+        {
+            trackerStatus[i].pose_valid = -1;
+        }
 
         for (int i = 0; i < trackerNum; i++)
         {
@@ -1354,29 +1357,43 @@ void Tracker::MainLoop()
         if (!circularWindow)
             framesSinceLastSeen = 0;
 
-        for (int i = 0; i < trackerNum; i++)
         {
-
             double frameTime = double(clock() - frame.captureTime) / double(CLOCKS_PER_SEC);
 
+            std::stringstream ss;
+
+            for (int i = 0; i < trackerNum; i++)
+                ss << "gettrackerpose " + std::to_string(i) + " " + std::to_string(frameTime + parameters->camLatency) << std::endl;
+
+            std::istringstream ret = connection->Send(ss.str());
+
             std::string word;
-            std::istringstream ret = connection->Send("gettrackerpose " + std::to_string(i) + " " + std::to_string(frameTime + parameters->camLatency));
-            ret >> word;
-            if (word != "trackerpose")
+
+            for (int i = 0; i < trackerNum; i++)
             {
-                continue;
+                ret >> word;
+                if (word != "trackerpose")
+                {
+                    continue;
+                }
+
+                //read to our variables
+                ret >> trackerStatus[i].idx;
+                ret >> trackerStatus[i].a;
+                ret >> trackerStatus[i].b;
+                ret >> trackerStatus[i].c;
+                ret >> trackerStatus[i].qw;
+                ret >> trackerStatus[i].qx;
+                ret >> trackerStatus[i].qy;
+                ret >> trackerStatus[i].qz;
+                ret >> trackerStatus[i].pose_valid;
             }
+        }
 
-            //first three variables are a position vector
-            int idx; double a; double b; double c;
 
-            //second four are rotation quaternion
-            double qw; double qx; double qy; double qz;
-
-            //read to our variables
-            ret >> idx; ret >> a; ret >> b; ret >> c; ret >> qw; ret >> qx; ret >> qy; ret >> qz; ret >> tracker_pose_valid[i];
-
-            cv::Mat rpos = (cv::Mat_<double>(4, 1) << -a, b, -c, 1);
+        for (int i = 0; i < trackerNum; i++)
+        {
+            cv::Mat rpos = (cv::Mat_<double>(4, 1) << -trackerStatus[i].a, trackerStatus[i].b, -trackerStatus[i].c, 1);
 
             //transform boards position based on our calibration data
 
@@ -1386,9 +1403,9 @@ void Tracker::MainLoop()
             cv::Vec3d rvec;
             cv::Vec3d tvec;
 
-            if (tracker_pose_valid[i] == 0)
+            if (trackerStatus[i].pose_valid == 0)
             {
-                Quaternion<double> q = Quaternion<double>(qw, qx, qy, qz);
+                Quaternion<double> q = Quaternion<double>(trackerStatus[i].qw, trackerStatus[i].qx, trackerStatus[i].qy, trackerStatus[i].qz);
                 q = q.UnitQuaternion();
 
                 //q = Quaternion<double>(0, 0, 1, 0) * (wrotation * q) * Quaternion<double>(0, 0, 1, 0);
@@ -1427,7 +1444,7 @@ void Tracker::MainLoop()
             circleOnPostRotatedImg(drawImg, projected[3], 5, cv::Scalar(255, 0, 255), rotateFlag, 2, 8, 0);
             circleOnPostRotatedImg(drawImgMasked, projected[3], 5, cv::Scalar(255, 0, 255), rotateFlag, 2, 8, 0);
 
-            if (tracker_pose_valid[i] == 0)
+            if (trackerStatus[i].pose_valid == 0)
             {
 
                 if (!trackerStatus[i].boardFound)
@@ -1720,7 +1737,7 @@ void Tracker::MainLoop()
                 }
                 else
                 {
-                    if ((tracker_pose_valid[i] != 0) || ((current_timestamp.count() - trackerStatus[i].last_update_timestamp.count()) <= 100.0))
+                    if ((trackerStatus[i].pose_valid != 0) || ((current_timestamp.count() - trackerStatus[i].last_update_timestamp.count()) <= 100.0))
                     {
                         trackerStatus[i].last_update_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
                     }
