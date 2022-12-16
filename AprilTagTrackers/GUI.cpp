@@ -80,8 +80,8 @@ CameraPage::CameraPage(wxNotebook* parent,GUI* parentGUI, Parameters* params)
         wxPoint(20, 20));
     wxCheckBox* cb8 = new wxCheckBox(this, GUI::PRIVACY_MODE, params->language.CAMERA_PRIVACY_MODE,
         wxPoint(20, 20));
-    //wxCheckBox* cb3 = new wxCheckBox(this, GUI::TIME_PROFILE_CHECKBOX, wxT("Show time profile"),
-    //   wxPoint(20, 20));
+    wxCheckBox* cb9 = new wxCheckBox(this, GUI::TIME_PROFILE_CHECKBOX, wxT("Show time profile"),
+       wxPoint(20, 20));
     //parentGUI->cb2 = new wxCheckBox(this, GUI::SPACE_CALIB_CHECKBOX, wxT("Calibrate playspace"),
     //    wxPoint(20, 20));
     parentGUI->cb3 = new wxCheckBox(this, GUI::MANUAL_CALIB_CHECKBOX, params->language.CAMERA_CALIBRATION_MODE,
@@ -112,6 +112,7 @@ CameraPage::CameraPage(wxNotebook* parent,GUI* parentGUI, Parameters* params)
     fgs->Add(cb6);
     fgs->Add(cb7);
     fgs->Add(cb8);
+    fgs->Add(cb9);
     //fgs->Add(new wxStaticText(this, -1, wxT("")), 0, wxEXPAND);
     //fgs->Add(parentGUI->calibrationModeCheckbox);
 

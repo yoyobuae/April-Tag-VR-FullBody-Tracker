@@ -42,6 +42,7 @@ public:
     static const int DISABLE_OUT_CHECKBOX = 12;
     static const int DISABLE_OPENVR_API_CHECKBOX = 13;
     static const int PRIVACY_MODE = 14;
+    static const int TIME_PROFILE_CHECKBOX = 15;
 
     ValueInput *manualCalibX;
     ValueInput *manualCalibY;

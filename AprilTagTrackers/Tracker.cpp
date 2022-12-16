@@ -2004,7 +2004,7 @@ void Tracker::MainLoop()
         end = clock();
         double frameTime = double(end - start) / double(CLOCKS_PER_SEC);
 
-        if (showTimingStats)
+        if (showTimeProfile)
         {
             cv::Mat *outImg = new cv::Mat();
 
