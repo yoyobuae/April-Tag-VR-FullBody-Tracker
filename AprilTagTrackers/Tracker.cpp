@@ -1396,6 +1396,11 @@ void Tracker::MainLoop()
 
         for (int i = 0; i < trackerNum; i++)
         {
+            trackerStatus[i].maskCenters.clear();
+        }
+
+        for (int i = 0; i < trackerNum; i++)
+        {
             cv::Mat rpos = (cv::Mat_<double>(4, 1) << -trackerStatus[i].a, trackerStatus[i].b, -trackerStatus[i].c, 1);
 
             //transform boards position based on our calibration data
@@ -1453,12 +1458,12 @@ void Tracker::MainLoop()
 
                 if (!trackerStatus[i].boardFound)
                 {
-                    trackerStatus[i].maskCenter = projected[2];
+                    trackerStatus[i].maskCenters.push_back(projected[2]);
                     trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[2].z);
                 }
                 else
                 {
-                    trackerStatus[i].maskCenter = projected[3];
+                    trackerStatus[i].maskCenters.push_back(projected[3]);
                     trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[3].z);
                 }
 
@@ -1473,7 +1478,7 @@ void Tracker::MainLoop()
             {
                 if (trackerStatus[i].boardFound)
                 {
-                    trackerStatus[i].maskCenter = projected[3];
+                    trackerStatus[i].maskCenters.push_back(projected[3]);
                     trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[3].z);
                 }
 
@@ -1494,26 +1499,29 @@ void Tracker::MainLoop()
         //I assume you want to draw the circle at the center of your image, with a radius of 50
         for (int i = 0; i < trackerNum; i++)
         {
-            if (trackerStatus[i].maskCenter.x <= 0 || trackerStatus[i].maskCenter.y <= 0 || trackerStatus[i].maskCenter.x >= rotated_cols || trackerStatus[i].maskCenter.y >= rotated_rows)
+            for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
             {
-                trackerStatus[i].boardFound = false;    //if detected tracker is out of view of the camera, we mark it as not found, as either the prediction is wrong or we wont see it anyway
-                continue;
-            }
-            doMasking = true;
-            if (circularWindow)
-            {
-                circleOnPostRotatedImg(mask, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, -1, 8, 0);
-                circleOnPostRotatedImg(drawImg, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
-                circleOnPostRotatedImg(drawImgMasked, trackerStatus[i].maskCenter, trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
-            }
-            else
-            {
-                cv::Point topLeft = cv::Point(trackerStatus[i].maskCenter.x - trackerStatus[i].searchSize, 0);
-                cv::Point bottomRight = cv::Point(trackerStatus[i].maskCenter.x + trackerStatus[i].searchSize, rotated_rows);
+                if (trackerStatus[i].maskCenters[j].x <= 0 || trackerStatus[i].maskCenters[j].y <= 0 || trackerStatus[i].maskCenters[j].x >= rotated_cols || trackerStatus[i].maskCenters[j].y >= rotated_rows)
+                {
+                    trackerStatus[i].boardFound = false;    //if detected tracker is out of view of the camera, we mark it as not found, as either the prediction is wrong or we wont see it anyway
+                    continue;
+                }
+                doMasking = true;
+                if (circularWindow)
+                {
+                    circleOnPostRotatedImg(mask, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, -1, 8, 0);
+                    circleOnPostRotatedImg(drawImg, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
+                    circleOnPostRotatedImg(drawImgMasked, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
+                }
+                else
+                {
+                    cv::Point topLeft = cv::Point(trackerStatus[i].maskCenters[j].x - trackerStatus[i].searchSize, 0);
+                    cv::Point bottomRight = cv::Point(trackerStatus[i].maskCenters[j].x + trackerStatus[i].searchSize, rotated_rows);
 
-                rectangleOnPostRotatedImg(mask, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, -1);
-                rectangleOnPostRotatedImg(drawImg, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
-                rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, rotateFlag, 0), 3);
+                    rectangleOnPostRotatedImg(mask, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, -1);
+                    rectangleOnPostRotatedImg(drawImg, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
+                    rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, rotateFlag, 0), 3);
+                }
             }
         }
 

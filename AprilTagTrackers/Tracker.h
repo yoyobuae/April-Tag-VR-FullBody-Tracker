@@ -22,7 +22,7 @@ struct TrackerStatus {
     cv::Vec3d boardRvec, boardTvec, boardTvecDriver;
     bool boardFound, boardFoundDriver;
     std::vector<std::vector<double>> prevLocValues;
-    cv::Point2d maskCenter;
+    std::vector<cv::Point2d> maskCenters;
     std::chrono::milliseconds last_update_timestamp;
     int searchSize;
     int pose_valid;
