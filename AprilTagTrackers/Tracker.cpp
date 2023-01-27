@@ -1192,6 +1192,46 @@ void Tracker::CalibrateTracker()
                    });
 }
 
+const char *cvTypeToStr(int type)
+{
+    switch(type) {
+    case CV_8UC1: return "CV_8UC1";
+    case CV_8UC2: return "CV_8UC2";
+    case CV_8UC3: return "CV_8UC3";
+    case CV_8UC4: return "CV_8UC4";
+    case CV_8SC1: return "CV_8SC1";
+    case CV_8SC2: return "CV_8SC2";
+    case CV_8SC3: return "CV_8SC3";
+    case CV_8SC4: return "CV_8SC4";
+    case CV_16UC1: return "CV_16UC1";
+    case CV_16UC2: return "CV_16UC2";
+    case CV_16UC3: return "CV_16UC3";
+    case CV_16UC4: return "CV_16UC4";
+    case CV_16SC1: return "CV_16SC1";
+    case CV_16SC2: return "CV_16SC2";
+    case CV_16SC3: return "CV_16SC3";
+    case CV_16SC4: return "CV_16SC4";
+    case CV_32SC1: return "CV_32SC1";
+    case CV_32SC2: return "CV_32SC2";
+    case CV_32SC3: return "CV_32SC3";
+    case CV_32SC4: return "CV_32SC4";
+    case CV_32FC1: return "CV_32FC1";
+    case CV_32FC2: return "CV_32FC2";
+    case CV_32FC3: return "CV_32FC3";
+    case CV_32FC4: return "CV_32FC4";
+    case CV_64FC1: return "CV_64FC1";
+    case CV_64FC2: return "CV_64FC2";
+    case CV_64FC3: return "CV_64FC3";
+    case CV_64FC4: return "CV_64FC4";
+    case CV_16FC1: return "CV_16FC1";
+    case CV_16FC2: return "CV_16FC2";
+    case CV_16FC3: return "CV_16FC3";
+    case CV_16FC4: return "CV_16FC4";
+    default: return "(unknown)";
+    }
+}
+
+
 void Tracker::MainLoop()
 {
 
@@ -1212,12 +1252,16 @@ void Tracker::MainLoop()
 
     cv::Mat  prevImg;
 
+    cv::Mat matchTemplateResult;
+    bool didMatchTemplate = false;
+
 
     //setup all variables that need to be stored for each tracker and initialize them
     std::vector<TrackerStatus> trackerStatus = std::vector<TrackerStatus>(trackerNum, TrackerStatus());
     for (int i = 0; i < trackerStatus.size(); i++)
     {
         trackerStatus[i].boardFound = false;
+        trackerStatus[i].doImageMatching = false;
         trackerStatus[i].boardRvec = cv::Vec3d(0, 0, 0);
         trackerStatus[i].boardTvec = cv::Vec3d(0, 0, 0);
         trackerStatus[i].prevLocValues = std::vector<std::vector<double>>(7, std::vector<double>());
@@ -1490,6 +1534,137 @@ void Tracker::MainLoop()
 
         frame.processPoseTime = clock();
 
+        didMatchTemplate = false;
+
+        for (int i = 0; i < trackerNum; i++)
+        {
+            if (!trackerStatus[i].doImageMatching)
+                continue;
+
+            int searchLeft   = static_cast<int>(trackerStatus[i].oldCenter.x - 3*trackerStatus[i].searchSize);
+            int searchRight  = static_cast<int>(trackerStatus[i].oldCenter.x + 3*trackerStatus[i].searchSize);
+            int searchTop    = static_cast<int>(trackerStatus[i].oldCenter.y - 3*trackerStatus[i].searchSize);
+            int searchBottom = static_cast<int>(trackerStatus[i].oldCenter.y + 3*trackerStatus[i].searchSize);
+
+            searchLeft   = (searchLeft   >= gray.cols) ? (gray.cols - 1) : ((searchLeft   < 0) ? 0 : searchLeft);
+            searchRight  = (searchRight  >= gray.cols) ? (gray.cols - 1) : ((searchRight  < 0) ? 0 : searchRight);
+            searchTop    = (searchTop    >= gray.rows) ? (gray.rows - 1) : ((searchTop    < 0) ? 0 : searchTop);
+            searchBottom = (searchBottom >= gray.rows) ? (gray.rows - 1) : ((searchBottom < 0) ? 0 : searchBottom);
+
+            const int x = searchLeft, y = searchTop;
+            const int w = searchRight - searchLeft, h = searchBottom - searchTop;
+
+            if ((w <= 8*trackerStatus[i].snapshot.cols) || (h <= 8*trackerStatus[i].snapshot.rows))
+                continue;
+
+            cv::Mat searchGray;
+            cv::resize(cv::Mat(gray, cv::Rect(x, y, w, h)), searchGray, cv::Size(), 1.0/8.0, 1.0/8.0, cv::INTER_NEAREST);
+
+            cv::matchTemplate(searchGray, trackerStatus[i].snapshot, matchTemplateResult, cv::TM_CCOEFF);
+            didMatchTemplate = true;
+
+            float min = 0.0f, max = 0.0f;
+            auto it = matchTemplateResult.begin<float>(), it_end = matchTemplateResult.end<float>();
+            for (; it != it_end; ++it)
+            {
+                if (*it < min)
+                    min = *it;
+                if (*it > max)
+                    max = *it;
+            }
+            it = matchTemplateResult.begin<float>();
+            for (; it != it_end; ++it)
+            {
+                *it = (*it - min)/(max - min);
+            }
+
+            cv::Mat thresholded;
+            cv::threshold(matchTemplateResult, thresholded, 0.85, 1.0, cv::THRESH_BINARY);
+
+            thresholded.convertTo(thresholded, CV_8UC1, 255.0);
+
+#if 0
+            static bool foo = true;
+            if (foo)
+            {
+                std::cout << "thresholded.type(): " << cvTypeToStr(thresholded.type()) << std::endl;
+                foo = false;
+            }
+#endif
+            cv::Mat labels, stats, centroids;
+            int cc = cv::connectedComponentsWithStats(thresholded, labels, stats, centroids);
+
+#if 0
+            static bool foo = true;
+            if (foo)
+            {
+                std::cout << "cc: " << cc << std::endl;
+                std::cout << "stats: " << stats << std::endl;
+                std::cout << "centroids: " << centroids << std::endl;
+                foo = false;
+            }
+#endif
+            for (int j = 1; j < centroids.rows; ++j)
+            {
+#if 0
+                static bool foo = true;
+                if (foo)
+                {
+                    std::cout << "centroids.type(): " << cvTypeToStr(centroids.type()) << std::endl;
+                    std::cout << "centroid: " << centroids.row(j) << std::endl;
+                    foo = false;
+                }
+#endif
+                int left   = 8*static_cast<int>(centroids.at<double>(j,0)) + searchLeft;
+                int top    = 8*static_cast<int>(centroids.at<double>(j,1)) + searchTop;
+                int right  = left + 8*trackerStatus[i].snapshot.cols;
+                int bottom = top  + 8*trackerStatus[i].snapshot.rows;
+
+#if 0
+                static bool foo = true;
+                if (foo)
+                {
+                    std::cout << "centroids.at<int>(j,0): " << centroids.at<int>(j,0) << std::endl;
+                    std::cout << "centroids.at<int>(j,1): " << centroids.at<int>(j,1) << std::endl;
+                    std::cout << "centroids.at<double>(j,0): " << centroids.at<double>(j,0) << std::endl;
+                    std::cout << "centroids.at<double>(j,1): " << centroids.at<double>(j,1) << std::endl;
+
+                    std::cout << "searchLeft: " << searchLeft << std::endl;
+                    std::cout << "searchTop:  " << searchTop << std::endl;
+
+                    std::cout << "left:   " << left << std::endl;
+                    std::cout << "top:    " << top << std::endl;
+                    std::cout << "right:  " << right << std::endl;
+                    std::cout << "bottom: " << bottom << std::endl;
+                    foo = false;
+                }
+#endif
+
+                cv::rectangle(drawImg, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(0, 0, 255), 3);
+                cv::rectangle(drawImgMasked, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(0, 0, 255), 3);
+
+                cv::Point2f center = cv::Point2f((left + right)/2, (top + bottom)/2);
+
+                auto tmp = center.x;
+                switch (rotateFlag) {
+                case cv::ROTATE_180:
+                    center.x = rotated_cols - center.x;
+                    center.y = rotated_rows - center.y;
+                    break;
+                case cv::ROTATE_90_CLOCKWISE:
+                    center.x = rotated_cols - center.y;
+                    center.y = tmp;
+                    break;
+                case cv::ROTATE_90_COUNTERCLOCKWISE:
+                    center.x = center.y;
+                    center.y = rotated_rows - tmp;
+                    break;
+                }
+
+                trackerStatus[i].maskCenters.push_back(center);
+            }
+        }
+
         //Then define your mask image
         cv::Mat mask = cv::Mat::zeros(gray.size(), gray.type());
 
@@ -1521,7 +1696,7 @@ void Tracker::MainLoop()
 
                     rectangleOnPostRotatedImg(mask, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, -1);
                     rectangleOnPostRotatedImg(drawImg, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
-                    rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, rotateFlag, 0), 3);
+                    rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
                 }
             }
         }
@@ -1692,6 +1867,8 @@ void Tracker::MainLoop()
 
         for (int i = 0; i < trackerNum; ++i)
         {
+            trackerStatus[i].doImageMatching = false;
+
             std::vector<float> trackerXCoords;
             std::vector<float> trackerYCoords;
 
@@ -1709,16 +1886,27 @@ void Tracker::MainLoop()
 
             if (!trackerXCoords.empty() && !trackerYCoords.empty())
             {
-                const auto [left, right] = std::minmax_element(trackerXCoords.begin(), trackerXCoords.end());
-                const auto [top, bottom] = std::minmax_element(trackerYCoords.begin(), trackerYCoords.end());
+                const auto [leftit, rightit] = std::minmax_element(trackerXCoords.begin(), trackerXCoords.end());
+                const auto [topit, bottomit] = std::minmax_element(trackerYCoords.begin(), trackerYCoords.end());
 
-                const int x = static_cast<int>(*left), y = static_cast<int>(*top);
-                const int w = static_cast<int>(*right - *left), h = static_cast<int>(*bottom - *top);
+                auto left = *leftit;
+                auto top = *topit;
+                auto right = *rightit;
+                auto bottom = *bottomit;
+
+                left   = (left   >= gray.cols) ? (gray.cols - 1) : ((left   < 0) ? 0 : left);
+                right  = (right  >= gray.cols) ? (gray.cols - 1) : ((right  < 0) ? 0 : right);
+                top    = (top    >= gray.rows) ? (gray.rows - 1) : ((top    < 0) ? 0 : top);
+                bottom = (bottom >= gray.rows) ? (gray.rows - 1) : ((bottom < 0) ? 0 : bottom);
+
+                const int x = static_cast<int>(left), y = static_cast<int>(top);
+                const int w = static_cast<int>(right - left), h = static_cast<int>(bottom - top);
 
                 if ((w > 0) && (h > 0))
                 {
                     cv::resize(cv::Mat(gray, cv::Rect(x, y, w, h)), trackerStatus[i].snapshot, cv::Size(), 1.0/8.0, 1.0/8.0, cv::INTER_NEAREST);
-
+                    trackerStatus[i].doImageMatching = true;
+                    trackerStatus[i].oldCenter = cv::Point2f((left + right)/2, (top + bottom)/2);
                 }
             }
         }
@@ -2132,15 +2320,20 @@ void Tracker::MainLoop()
                 april.drawTimeProfile(*outImg, cv::Point(10, 60));
             }            
             
-            gui->CallAfter([outImg, this] ()
+            cv::Mat *outMatchTemplateResult = new cv::Mat();
+            matchTemplateResult.convertTo(*outMatchTemplateResult, CV_8UC1, 255.0);
+
+            gui->CallAfter([outImg, outMatchTemplateResult, didMatchTemplate, this] ()
                            {
                            if (this->rotate)
                            {
                            cv::rotate(*outImg, *outImg, this->rotateFlag);
                            }
                            cv::imshow("out", *outImg);
+                           //if (didMatchTemplate) cv::imshow("matchTemplateResult", *outMatchTemplateResult);
                            cv::waitKey(1);
                            delete(outImg);
+                           delete(outMatchTemplateResult);
                            });
         }
         //time of marker detection
