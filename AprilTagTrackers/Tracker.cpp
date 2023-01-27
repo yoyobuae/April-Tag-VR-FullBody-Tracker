@@ -1196,6 +1196,7 @@ void Tracker::MainLoop()
 {
 
     int trackerNum = connection->connectedTrackers.size();
+    int markersPerTracker = parameters->markersPerTracker;
     int numOfPrevValues = parameters->numOfPrevValues;
 
     //these variables are used to save detections of apriltags, so we dont define them every frame
@@ -1688,6 +1689,39 @@ void Tracker::MainLoop()
         }
         april.detectMarkers(gray, &corners, &ids, &centers, trackers);
         frame.detectTime = clock();
+
+        for (int i = 0; i < trackerNum; ++i)
+        {
+            std::vector<float> trackerXCoords;
+            std::vector<float> trackerYCoords;
+
+            for (int j = 0; j < ids.size(); j++)        //check all of the found markers
+            {
+                if (ids[j] >= i * markersPerTracker && ids[j] < (i + 1) * markersPerTracker)            //if marker is part of current tracker
+                {
+                    for (int k = 0; k < corners[j].size(); k++)
+                    {
+                        trackerXCoords.push_back(corners[j][k].x);
+                        trackerYCoords.push_back(corners[j][k].y);
+                    }
+                }
+            }
+
+            if (!trackerXCoords.empty() && !trackerYCoords.empty())
+            {
+                const auto [left, right] = std::minmax_element(trackerXCoords.begin(), trackerXCoords.end());
+                const auto [top, bottom] = std::minmax_element(trackerYCoords.begin(), trackerYCoords.end());
+
+                const int x = static_cast<int>(*left), y = static_cast<int>(*top);
+                const int w = static_cast<int>(*right - *left), h = static_cast<int>(*bottom - *top);
+
+                if ((w > 0) && (h > 0))
+                {
+                    cv::resize(cv::Mat(gray, cv::Rect(x, y, w, h)), trackerStatus[i].snapshot, cv::Size(), 1.0/8.0, 1.0/8.0, cv::INTER_NEAREST);
+
+                }
+            }
+        }
 
         for (int i = 0; i < corners.size(); i++) {
             for (int j = 0; j < corners[i].size(); j++) {

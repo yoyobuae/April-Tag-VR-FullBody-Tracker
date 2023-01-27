@@ -20,6 +20,7 @@
 
 struct TrackerStatus {
     cv::Vec3d boardRvec, boardTvec, boardTvecDriver;
+    cv::Mat snapshot;
     bool boardFound, boardFoundDriver;
     std::vector<std::vector<double>> prevLocValues;
     std::vector<cv::Point2d> maskCenters;
