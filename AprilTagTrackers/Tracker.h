@@ -17,6 +17,65 @@
 #include "Quaternion.h"
 #include "Util.h"
 
+struct TrackerPose {
+    int pose_valid;
+    double a, b, c;
+    double qw, qx, qy, qz;
+};
+
+static TrackerPose operator+(TrackerPose lhs, const TrackerPose &rhs)
+{
+    lhs.a += rhs.a;
+    lhs.b += rhs.b;
+    lhs.c += rhs.c;
+    lhs.qw += rhs.qw;
+    lhs.qx += rhs.qx;
+    lhs.qy += rhs.qy;
+    lhs.qz += rhs.qz;
+    return lhs;
+}
+
+static TrackerPose operator-(TrackerPose lhs, const TrackerPose &rhs)
+{
+    lhs.a -= rhs.a;
+    lhs.b -= rhs.b;
+    lhs.c -= rhs.c;
+    lhs.qw -= rhs.qw;
+    lhs.qx -= rhs.qx;
+    lhs.qy -= rhs.qy;
+    lhs.qz -= rhs.qz;
+    return lhs;
+}
+
+static TrackerPose operator/(TrackerPose lhs, double rhs)
+{
+    lhs.a /= rhs;
+    lhs.b /= rhs;
+    lhs.c /= rhs;
+    lhs.qw /= rhs;
+    lhs.qx /= rhs;
+    lhs.qy /= rhs;
+    lhs.qz /= rhs;
+    return lhs;
+}
+
+static double sigmoid(double d)
+{
+    return 1.0 / (1.0 + std::exp(-d));
+}
+
+static TrackerPose compress(TrackerPose p)
+{
+    p.a = sigmoid(10.0*p.a)/2.5 -0.5/2.5;
+    p.b = sigmoid(10.0*p.b)/2.5 -0.5/2.5;
+    p.c = sigmoid(10.0*p.c)/2.5 -0.5/2.5;
+    p.qw = sigmoid(10.0*p.qw)/2.5 -0.5/2.5;
+    p.qx = sigmoid(10.0*p.qx)/2.5 -0.5/2.5;
+    p.qy = sigmoid(10.0*p.qy)/2.5 -0.5/2.5;
+    p.qz = sigmoid(10.0*p.qz)/2.5 -0.5/2.5;
+
+    return p;
+}
 
 struct TrackerStatus {
     cv::Vec3d boardRvec, boardTvec, boardTvecDriver;
@@ -32,6 +91,9 @@ struct TrackerStatus {
     cv::Mat snapshot;
     bool doImageMatching;
     cv::Point2f oldCenter;
+    int pose_delta_index;
+    TrackerPose pose_delta_history[90];
+    TrackerPose pose_delta_average;
 };
 
 

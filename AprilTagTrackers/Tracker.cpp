@@ -1267,6 +1267,17 @@ void Tracker::MainLoop()
         trackerStatus[i].prevLocValues = std::vector<std::vector<double>>(7, std::vector<double>());
         trackerStatus[i].last_update_timestamp = std::chrono::milliseconds(0);
         trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0));
+        trackerStatus[i].pose_delta_index = 0;
+        for (int j = 0; j < 90; j++)
+        {
+            trackerStatus[i].pose_delta_history[j].a = 0.0;
+            trackerStatus[i].pose_delta_history[j].b = 0.0;
+            trackerStatus[i].pose_delta_history[j].c = 0.0;
+            trackerStatus[i].pose_delta_history[j].qw = 0.0;
+            trackerStatus[i].pose_delta_history[j].qx = 0.0;
+            trackerStatus[i].pose_delta_history[j].qy = 0.0;
+            trackerStatus[i].pose_delta_history[j].qz = 0.0;
+        }
     }
 
     //previous values, used for moving median to remove any outliers.
@@ -1399,16 +1410,29 @@ void Tracker::MainLoop()
                     continue;
                 }
 
+                TrackerPose pose_from_driver;
+
                 //read to our variables
                 ret >> trackerStatus[i].idx;
-                ret >> trackerStatus[i].a;
-                ret >> trackerStatus[i].b;
-                ret >> trackerStatus[i].c;
-                ret >> trackerStatus[i].qw;
-                ret >> trackerStatus[i].qx;
-                ret >> trackerStatus[i].qy;
-                ret >> trackerStatus[i].qz;
+                ret >> pose_from_driver.a;
+                ret >> pose_from_driver.b;
+                ret >> pose_from_driver.c;
+                ret >> pose_from_driver.qw;
+                ret >> pose_from_driver.qx;
+                ret >> pose_from_driver.qy;
+                ret >> pose_from_driver.qz;
                 ret >> trackerStatus[i].pose_valid;
+
+
+                TrackerPose pose_to_store = pose_from_driver - trackerStatus[i].pose_delta_average;
+
+                trackerStatus[i].a = pose_to_store.a;
+                trackerStatus[i].b = pose_to_store.b;
+                trackerStatus[i].c = pose_to_store.c;
+                trackerStatus[i].qw = pose_to_store.qw;
+                trackerStatus[i].qx = pose_to_store.qx;
+                trackerStatus[i].qy = pose_to_store.qy;
+                trackerStatus[i].qz = pose_to_store.qz;
             }
         }
 
@@ -2138,8 +2162,115 @@ void Tracker::MainLoop()
 
             //send all the values
             //frame time is how much time passed since frame was acquired.
-            if (!multicamAutocalib)
-                connection->SendTracker(connection->connectedTrackers[i].DriverId, a, b, c, q.w, q.x, q.y, q.z, -frameTime - parameters->camLatency, factor);
+            if (!multicamAutocalib) {
+
+                TrackerPose pose_local;
+                pose_local.a = a;
+                pose_local.b = b;
+                pose_local.c = c;
+                pose_local.qw = q.w;
+                pose_local.qx = q.x;
+                pose_local.qy = q.y;
+                pose_local.qz = q.z;
+
+                TrackerPose pose_to_send = pose_local + trackerStatus[i].pose_delta_average;
+
+                std::istringstream ret = connection->SendTracker(connection->connectedTrackers[i].DriverId,
+                                                                 pose_to_send.a,
+                                                                 pose_to_send.b,
+                                                                 pose_to_send.c,
+                                                                 pose_to_send.qw,
+                                                                 pose_to_send.qx,
+                                                                 pose_to_send.qy,
+                                                                 pose_to_send.qz,
+                                                                 -frameTime - parameters->camLatency,
+                                                                 factor);
+
+                // printf("Response from driver: %s\n", ret.str().c_str());
+
+                do {
+                    std::string word;
+
+                    ret >> word;
+
+                    if (word != "updated")
+                    {
+                        break;
+                    }
+
+                    int idx, pose_valid;
+                    TrackerPose pose_from_driver;
+
+                    //read to our variables
+                    ret >> idx;
+                    ret >> pose_from_driver.a;
+                    ret >> pose_from_driver.b;
+                    ret >> pose_from_driver.c;
+                    ret >> pose_from_driver.qw;
+                    ret >> pose_from_driver.qx;
+                    ret >> pose_from_driver.qy;
+                    ret >> pose_from_driver.qz;
+                    ret >> pose_from_driver.pose_valid;
+
+                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average - trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 90.0;
+                    trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] = compress(pose_from_driver - pose_local);
+                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average + trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 90.0;
+                    if(++trackerStatus[i].pose_delta_index == 90)
+                        trackerStatus[i].pose_delta_index = 0;
+
+#if 0
+                    printf("local: % 3.3f % 3.3f % 3.3f q: % 3.3f % 3.3f % 3.3f % 3.3f ",
+                           a,
+                           b,
+                           c,
+                           q.w,
+                           q.x,
+                           q.y,
+                           q.z);
+#endif
+#if 1
+                    printf("sent: % 3.3f % 3.3f % 3.3f q: % 3.3f % 3.3f % 3.3f % 3.3f ",
+                           pose_to_send.a,
+                           pose_to_send.b,
+                           pose_to_send.c,
+                           pose_to_send.qw,
+                           pose_to_send.qx,
+                           pose_to_send.qy,
+                           pose_to_send.qz);
+#endif
+#if 1
+                    printf("driver: % 3.3f % 3.3f % 3.3f q: % 3.3f % 3.3f % 3.3f % 3.3f valid: %d ",
+                           pose_from_driver.a,
+                           pose_from_driver.b,
+                           pose_from_driver.c,
+                           pose_from_driver.qw,
+                           pose_from_driver.qx,
+                           pose_from_driver.qy,
+                           pose_from_driver.qz,
+                           pose_from_driver.pose_valid);
+#endif
+#if 0
+                    printf("Tracker delta: a: %3.3f b: %3.3f c: %3.3f qw: %3.3f qx: %3.3f qy: %3.3f qz: %3.3f\n",
+                           a - trackerStatusInDriver.a,
+                           b - trackerStatusInDriver.b,
+                           c - trackerStatusInDriver.c,
+                           q.w - trackerStatusInDriver.qw,
+                           q.x - trackerStatusInDriver.qx,
+                           q.y - trackerStatusInDriver.qy,
+                           q.z - trackerStatusInDriver.qz);
+#endif
+                    printf("average: % 3.4f % 3.4f % 3.4f q: % 3.4f % 3.4f % 3.4f % 3.4f\n",
+                           trackerStatus[i].pose_delta_average.a,
+                           trackerStatus[i].pose_delta_average.b,
+                           trackerStatus[i].pose_delta_average.c,
+                           trackerStatus[i].pose_delta_average.qw,
+                           trackerStatus[i].pose_delta_average.qx,
+                           trackerStatus[i].pose_delta_average.qy,
+                           trackerStatus[i].pose_delta_average.qz);
+
+                } while (false);
+
+            }
             else if (trackerStatus[i].boardFoundDriver)
             {
                 //get rotations of tracker from camera
