@@ -1690,7 +1690,7 @@ void Tracker::MainLoop1()
                     calibratorPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                     calibratorTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
-                    if (calibratorPoints1.size() > 1000 && calibratorPoints2.size() > 1000)
+                    if (calibratorPoints1.size() > 3000 && calibratorPoints2.size() > 3000)
                     {
                         cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                         wtranslation2 = wtranslation * wtranslation2;
@@ -2255,7 +2255,7 @@ void Tracker::MainLoop2()
                     calibratorPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                     calibratorTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
-                    if (calibratorPoints1.size() > 1000 && calibratorPoints2.size() > 1000)
+                    if (calibratorPoints1.size() > 3000 && calibratorPoints2.size() > 3000)
                     {
                         cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                         wtranslation2 = wtranslation * wtranslation2;
