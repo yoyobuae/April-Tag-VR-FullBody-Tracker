@@ -24,6 +24,7 @@ void Connection::StartConnection()
     }
     if (status == CONNECTED)
     {
+#if 0
         gui->CallAfter([parameters=parameters] ()
                        {
                        wxMessageDialog dial(NULL,
@@ -31,6 +32,7 @@ void Connection::StartConnection()
                            wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
                        dial.ShowModal();
                        });
+#endif
         sleep_millis(1000);
         // Sleep(1000);
         status = DISCONNECTED;
