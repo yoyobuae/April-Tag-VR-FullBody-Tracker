@@ -2342,8 +2342,11 @@ void Tracker::MainLoop()
                    {
                    cv::destroyWindow("out");
                    });
-    gui->CallAfter([] ()
-                   {
-                   cv::destroyWindow("stats");
-                   });
+    if (showTimeProfile)
+    {
+        gui->CallAfter([] ()
+                       {
+                       cv::destroyWindow("stats");
+                       });
+    }
 }
