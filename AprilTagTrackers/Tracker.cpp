@@ -1957,7 +1957,7 @@ void Tracker::MainLoop()
             try
             {
                 trackerStatus[i].boardTvec /= calibScale;
-                if (cv::aruco::estimatePoseBoard(corners, ids, trackers[connection->connectedTrackers[i].TrackerId], parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, trackerStatus[i].boardFound && parameters->usePredictive) <= 0)
+                if (cv::aruco::estimatePoseBoard(corners, ids, trackers[connection->connectedTrackers[i].TrackerId], parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, trackerStatus[i].boardFound && parameters->usePredictive) <= 1)
                 {
                     for (int j = 0; j < 6; j++)
                     {
