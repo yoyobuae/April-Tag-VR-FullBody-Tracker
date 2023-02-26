@@ -156,13 +156,13 @@ public:
         // using copyTo with masking creates the image where everything but the locations where trackers are predicted to be is black
         if (atleastOneTrackerVisible)
         {
+            tempGrayMaskedImg = cv::Scalar(0); // fill with black
             grayAprilImg.copyTo(tempGrayMaskedImg, maskSearchImg);
-            grayAprilImg = tempGrayMaskedImg;
         }
 
         mCalibrator.Update(vrClient, mVRDriver, gui, mPlayspace, trackerCtrl->lockHeightCalib, trackerCtrl->manualRecalibrate);
 
-        april.DetectMarkers(grayAprilImg, dets);
+        april.DetectMarkers(tempGrayMaskedImg, dets);
         // frame time is how much time passed since frame was acquired.
         const double frameTimeAfterDetect = duration_cast<utils::FSeconds>(utils::SteadyTimer::Now() - frame.timestamp).count();
         for (int index = 0; index < trackerUnits->size(); ++index)
