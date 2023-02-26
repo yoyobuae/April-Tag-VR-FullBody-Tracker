@@ -261,6 +261,12 @@ void GUI::MainFrame::CreateCameraPage(RefPtr<wxNotebook> pages)
                        }})
             ->GetWidget();
 
+    cam .Add(StretchSpacer{})
+        .Add(CheckBoxButton{"Privacy mode", [this](auto& evt)
+            {
+            tracker->privacyMode = evt.IsChecked();
+            }});
+
     manualCalibForm = cam.PopSizer().SubForm();
 
     manualCalibForm->PushSizer<wxBoxSizer>(wxVERTICAL)

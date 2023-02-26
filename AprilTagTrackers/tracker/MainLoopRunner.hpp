@@ -45,6 +45,7 @@ public:
         // shallow copy, gray will be cloned from image and used for detection,
         // so drawing can happen on color image without clone.
         drawImg = frame.image;
+        cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
         AprilTagWrapper::ConvertGrayscale(frame.image, grayAprilImg);
         const bool previewIsVisible = gui->IsPreviewVisible();
 
@@ -93,7 +94,11 @@ public:
             const auto& [driverCenter, previousCenter] = projected;
 
             // project point from position of tracker in camera 3d space to 2d camera pixel space, and draw a dot there
-            if (previewIsVisible) cv::circle(drawImg, driverCenter, 5, cv::Scalar(0, 0, 255), 2, 8, 0);
+            if (previewIsVisible)
+            {
+                cv::circle(drawImg, driverCenter, 5, cv::Scalar(0, 0, 255), 2, 8, 0);
+                cv::circle(drawImgMasked, driverCenter, 5, cv::Scalar(0, 0, 255), 2, 8, 0);
+            }
 
             unit.SetWasVisibleToDriverLastFrame(isValid);
             cv::Point2d maskCenter;
@@ -124,14 +129,22 @@ public:
                 if (circularWindow) // if circular window is set mask a circle around the predicted tracker point
                 {
                     cv::circle(maskSearchImg, maskCenter, searchRadius, cv::Scalar(255), -1, 8, 0);
-                    if (previewIsVisible) cv::circle(drawImg, maskCenter, searchRadius, COLOR_MASK, 2, 8, 0);
+                    if (previewIsVisible)
+                    {
+                        cv::circle(drawImg, maskCenter, searchRadius, COLOR_MASK, 2, 8, 0);
+                        cv::circle(drawImgMasked, maskCenter, searchRadius, COLOR_MASK, 2, 8, 0);
+                    }
                 }
                 else // if not, mask a vertical strip top to bottom. This happens every 20 frames if a tracker is lost.
                 {
                     const int maskX = static_cast<int>(maskCenter.x);
                     const cv::Rect2i maskRect{cv::Point(maskX - searchRadius, 0), cv::Point2i(maskX + searchRadius, frame.image.rows)};
                     cv::rectangle(maskSearchImg, maskRect, cv::Scalar(255), -1);
-                    if (previewIsVisible) cv::rectangle(drawImg, maskRect, COLOR_MASK, 3);
+                    if (previewIsVisible)
+                    {
+                        cv::rectangle(drawImg, maskRect, COLOR_MASK, 3);
+                        cv::rectangle(drawImgMasked, maskRect, COLOR_MASK, 3);
+                    }
                 }
             }
             else
@@ -235,7 +248,11 @@ public:
 
             Pose pose = Pose(unit.GetEstimatedPose());
 
-            if (previewIsVisible) cv::drawFrameAxes(drawImg, camCalib->cameraMatrix, camCalib->distortionCoeffs, pose.rotation.toRotVec(), math::ToVec(pose.position), 0.10F);
+            if (previewIsVisible)
+            {
+                cv::drawFrameAxes(drawImg, camCalib->cameraMatrix, camCalib->distortionCoeffs, pose.rotation.toRotVec(), math::ToVec(pose.position), 0.10F);
+                cv::drawFrameAxes(drawImgMasked, camCalib->cameraMatrix, camCalib->distortionCoeffs, pose.rotation.toRotVec(), math::ToVec(pose.position), 0.10F);
+            }
 
             if (trackerCtrl->multicamAutocalib && unit.WasVisibleToDriverLastFrame())
             {
@@ -252,10 +269,34 @@ public:
 
         if (gui->IsPreviewVisible())
         {
+            // Copy only the inner white squares of detected markers into drawImgMasked
+            if (!dets.corners.empty()) {
+                cv::Mat mask = cv::Mat::zeros(drawImgMasked.size(), drawImgMasked.type());
+
+                for (int i = 0; i < dets.corners.size(); i++)
+                {
+                    std::vector<cv::Point> points;
+                    for(int j = 0; j < dets.corners[i].size(); j++){
+                        points.push_back(dets.corners[i].at(j));
+                    }
+                    cv::fillConvexPoly(mask, points, cv::Scalar(255, 255, 255), 8, 0);
+                }
+
+                drawImg.copyTo(drawImgMasked, mask);
+            }
+
             // draw and display the detections
-            if (!dets.ids.empty()) cv::aruco::drawDetectedMarkers(drawImg, dets.corners, dets.ids);
+            if (!dets.ids.empty())
+            {
+                cv::aruco::drawDetectedMarkers(drawImg, dets.corners, dets.ids);
+                cv::aruco::drawDetectedMarkers(drawImgMasked, dets.corners, dets.ids);
+            }
+
             const cv::Size2i drawSize = ConstrainSize(GetMatSize(frame.image), DRAW_IMG_SIZE);
-            cv::resize(drawImg, outImg, drawSize);
+            if (trackerCtrl->privacyMode)
+                cv::resize(drawImgMasked, outImg, drawSize);
+            else
+                cv::resize(drawImg, outImg, drawSize);
             cv::putText(outImg, std::to_string(frameTimeAfterDetect).substr(0, 5), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255));
             if (false) // TODO: tracker->showTimeProfile (is this even needed?)
             {
