@@ -42,6 +42,20 @@ void TransformMarkerSpace(const MarkerCorners3f& modelMarker, const RodrPose& bo
     }
 }
 
+void TransformFromBoardToCameraSpace(std::vector<cv::Point3d> in, const RodrPose& boardToCam, std::vector<cv::Point3d> *out)
+{
+    const auto boardTransform = boardToCam.ToAffine3d();
+
+    for (auto point : in)
+    {
+        cv::Vec3d vec3{point.x, point.y, point.z};
+        // multiply input points with board's translation matrix to get its position in camera(global) space
+        vec3 = boardTransform * vec3;
+        out->push_back(cv::Point3d(vec3[X], vec3[Y], vec3[Z]));
+    }
+}
+
+
 void transformMarkerSpace(std::vector<cv::Point3f> modelMarker, cv::Vec3d boardRvec, cv::Vec3d boardTvec, cv::Vec3d rvec, cv::Vec3d tvec, std::vector<cv::Point3f>* out)
 {
     // if any button was pressed, we try to add visible markers to our board

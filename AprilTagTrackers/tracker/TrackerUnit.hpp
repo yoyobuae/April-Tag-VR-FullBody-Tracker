@@ -18,18 +18,8 @@ class TrackerUnit
     using IdsList = std::vector<int>;
 
     /// move corners to the center of all markers in the list
-    static void RecenterCornersList(MarkersList& markers)
+    void RecenterCornersList(MarkersList& markers)
     {
-        cv::Point3f trackerCenter{};
-        for (const auto& corners : markers)
-        {
-            for (const auto& corner : corners)
-            {
-                trackerCenter += corner;
-            }
-        }
-        constexpr std::size_t numOfCorners = 4;
-        trackerCenter /= static_cast<float>(markers.size() * numOfCorners);
         for (auto& corners : markers)
         {
             for (auto& corner : corners)
@@ -63,9 +53,30 @@ public:
             cv::Point3f(-halfSize, -halfSize, 0)}; // bottom right
     }
 
+    void CalcMarkersCenter()
+    {
+        trackerCenter = cv::Point3f{0.f, 0.f, 0.f};
+        for (const auto& corners : mArucoBoard->objPoints)
+        {
+            for (const auto& corner : corners)
+            {
+                trackerCenter += corner;
+            }
+        }
+        constexpr std::size_t numOfCorners = 4;
+        trackerCenter /= static_cast<float>(mArucoBoard->objPoints.size() * numOfCorners);
+    }
+
+    cv::Point3d GetMarkersCenter()
+    {
+        return cv::Point3d{ trackerCenter.x, trackerCenter.y, trackerCenter.z };
+    }
+
     void RecenterMarkers()
     {
+        CalcMarkersCenter();
         RecenterCornersList(mArucoBoard->objPoints);
+        trackerCenter = cv::Point3f{0.f, 0.f, 0.f};
     }
 
     void SetMarkers(IdsList ids, MarkersList cornersList)
@@ -120,6 +131,7 @@ private:
         cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50),
         IdsList{});
 
+    cv::Point3f trackerCenter{};
     RodrPose mPose{};
     cv::Point2d mMaskCenter{};
     bool mIsFound = false;

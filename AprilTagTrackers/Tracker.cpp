@@ -842,7 +842,11 @@ void Tracker::SetTrackerUnitsFromConfig()
         const auto calib = calib_config.trackers[i];
         auto& unit = mTrackerUnits[i];
         unit.SetMarkers(calib->ids, calib->corners);
-        if (user_config.trackerCalibCenters) unit.RecenterMarkers();
+        if (user_config.trackerCalibCenters) {
+            unit.RecenterMarkers();
+        } else {
+            unit.CalcMarkersCenter();
+        }
         unit.SetRole(config->role);
     }
 }

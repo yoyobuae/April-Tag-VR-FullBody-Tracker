@@ -70,6 +70,7 @@ using MarkerCorners = std::array<cv::Point2d, 4>;
 
 void DrawMarker(const cv::Mat& frame, const MarkerCorners2f& corners, const cv::Scalar& color);
 void TransformMarkerSpace(const MarkerCorners3f& modelMarker, const RodrPose& boardToCam, const RodrPose& markerToCam, MarkerCorners3f& outMarker);
+void TransformFromBoardToCameraSpace(std::vector<cv::Point3d> in, const RodrPose& boardToCam, std::vector<cv::Point3d> *out);
 void FindMedianMarker(const std::vector<MarkerCorners3f>& markerList, MarkerCorners3f& outMedianMarker);
 
 [[deprecated]] void drawMarker(cv::Mat, std::vector<cv::Point2f>, cv::Scalar);

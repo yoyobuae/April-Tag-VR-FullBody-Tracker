@@ -84,14 +84,18 @@ public:
             if(isValid)
                 pose = mPlayspace->InvTransformFromOVR(pose);
 
-            std::array<cv::Point2d, 2> projected;
+            std::vector<cv::Point3d> inBoardSpace, inCameraSpace;
+            inBoardSpace.push_back(unit.GetMarkersCenter());
+            TransformFromBoardToCameraSpace(inBoardSpace, RodrPose(pose), &inCameraSpace);
+
+            std::array<cv::Point2d, 3> projected;
             {
                 const cv::Vec3d unusedRVec{}; // used to perform change of basis
                 const cv::Vec3d unusedTVec{};
-                const std::array<cv::Point3d, 2> points{pose.position, unit.GetEstimatedPose().position};
+                const std::array<cv::Point3d, 3> points{pose.position, unit.GetEstimatedPose().position, inCameraSpace[0]};
                 cv::projectPoints(points, unusedRVec, unusedTVec, camCalib->cameraMatrix, camCalib->distortionCoeffs, projected);
             }
-            const auto& [driverCenter, previousCenter] = projected;
+            const auto& [driverCenter, previousCenter, newCenter] = projected;
 
             // project point from position of tracker in camera 3d space to 2d camera pixel space, and draw a dot there
             if (previewIsVisible)
@@ -110,7 +114,7 @@ public:
                 }
                 else
                 {
-                    maskCenter = previousCenter;
+                    maskCenter = newCenter;
                 }
                 unit.SetWasVisibleLastFrame(true);
                 unit.SetPoseFromDriver(RodrPose(pose));
