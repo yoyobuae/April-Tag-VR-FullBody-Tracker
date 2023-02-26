@@ -99,8 +99,6 @@ public:
             cv::Point2d maskCenter;
             if (isValid) // if the pose from steamvr was valid, save the predicted position and rotation
             {
-                if (previewIsVisible) cv::drawFrameAxes(drawImg, camCalib->cameraMatrix, camCalib->distortionCoeffs, pose.rotation.toRotVec(), math::ToVec(pose.position), 0.10F);
-
                 if (!unit.WasVisibleLastFrame()) // if tracker was found in previous frame, we use that position for masking. If not, we use position from driver for masking.
                 {
                     maskCenter = driverCenter;
@@ -235,6 +233,10 @@ public:
                 }
             }
 
+            Pose pose = Pose(unit.GetEstimatedPose());
+
+            if (previewIsVisible) cv::drawFrameAxes(drawImg, camCalib->cameraMatrix, camCalib->distortionCoeffs, pose.rotation.toRotVec(), math::ToVec(pose.position), 0.10F);
+
             if (trackerCtrl->multicamAutocalib && unit.WasVisibleToDriverLastFrame())
             {
                 tracker::PlayspaceCalibrator::UpdateMulticam(gui, mPlayspace, unit);
@@ -242,7 +244,7 @@ public:
             }
 
             // transform boards position based on our calibration data
-            Pose poseToSend = mPlayspace->TransformToOVR(Pose(unit.GetEstimatedPose()));
+            Pose poseToSend = mPlayspace->TransformToOVR(pose);
 
             // send all the values
             mVRDriver->UpdateTracker(index, poseToSend, -frameTimeAfterDetect - videoStream->latency, mConfig->smoothingFactor);
