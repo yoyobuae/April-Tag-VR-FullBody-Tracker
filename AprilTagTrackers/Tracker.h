@@ -92,7 +92,7 @@ struct TrackerStatus {
     bool doImageMatching;
     cv::Point2f oldCenter;
     int pose_delta_index;
-    TrackerPose pose_delta_history[90];
+    TrackerPose pose_delta_history[30];
     TrackerPose pose_delta_average;
 };
 
