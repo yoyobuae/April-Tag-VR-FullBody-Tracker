@@ -1709,18 +1709,24 @@ void Tracker::MainLoop()
                 doMasking = true;
                 if (circularWindow)
                 {
-                    circleOnPostRotatedImg(mask, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, -1, 8, 0);
-                    circleOnPostRotatedImg(drawImg, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
-                    circleOnPostRotatedImg(drawImgMasked, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
+                    if (trackerStatus[i].searchSize > 0)
+                    {
+                        circleOnPostRotatedImg(mask, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, -1, 8, 0);
+                        circleOnPostRotatedImg(drawImg, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
+                        circleOnPostRotatedImg(drawImgMasked, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
+                    }
                 }
                 else
                 {
-                    cv::Point topLeft = cv::Point(trackerStatus[i].maskCenters[j].x - trackerStatus[i].searchSize, 0);
-                    cv::Point bottomRight = cv::Point(trackerStatus[i].maskCenters[j].x + trackerStatus[i].searchSize, rotated_rows);
+                    if (trackerStatus[i].searchSize > 0)
+                    {
+                        cv::Point topLeft = cv::Point(trackerStatus[i].maskCenters[j].x - trackerStatus[i].searchSize, 0);
+                        cv::Point bottomRight = cv::Point(trackerStatus[i].maskCenters[j].x + trackerStatus[i].searchSize, rotated_rows);
 
-                    rectangleOnPostRotatedImg(mask, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, -1);
-                    rectangleOnPostRotatedImg(drawImg, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
-                    rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
+                        rectangleOnPostRotatedImg(mask, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, -1);
+                        rectangleOnPostRotatedImg(drawImg, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
+                        rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
+                    }
                 }
             }
         }
