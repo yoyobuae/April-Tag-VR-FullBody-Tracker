@@ -1926,7 +1926,7 @@ void Tracker::MainLoop()
                 const int x = static_cast<int>(left), y = static_cast<int>(top);
                 const int w = static_cast<int>(right - left), h = static_cast<int>(bottom - top);
 
-                if ((w > 0) && (h > 0))
+                if ((w >= 8) && (h >= 8))
                 {
                     cv::resize(cv::Mat(gray, cv::Rect(x, y, w, h)), trackerStatus[i].snapshot, cv::Size(), 1.0/8.0, 1.0/8.0, cv::INTER_NEAREST);
                     trackerStatus[i].doImageMatching = true;
