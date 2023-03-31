@@ -111,6 +111,24 @@ void Connection::Connect()
         connectedTrackers[0].Role = "TrackerRole_LeftFoot";
         connectedTrackers[1].Role = "TrackerRole_RightFoot";
     }
+    else if(parameters->trackerNum == 11)
+    {
+        for (int i = 0; i < parameters->trackerNum; i++)
+        {
+            std::stringstream ss;
+            ss << "ApriltagTracker" << std::hex << i;
+
+            TrackerConnection temp;
+            temp.TrackerId = i;
+            temp.DriverId = i;
+            temp.Name = ss.str();
+            temp.Role = "TrackerRole_Disabled";
+            connectedTrackers.push_back(temp);
+        }
+        connectedTrackers[0].Role = "TrackerRole_Waist";
+        connectedTrackers[1].Role = "TrackerRole_LeftFoot";
+        connectedTrackers[2].Role = "TrackerRole_RightFoot";
+    }
     else
     {
         for (int i = 0; i < parameters->trackerNum; i++)
