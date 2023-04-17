@@ -1268,7 +1268,7 @@ void Tracker::MainLoop()
         trackerStatus[i].last_update_timestamp = std::chrono::milliseconds(0);
         trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0));
         trackerStatus[i].pose_delta_index = 0;
-        for (int j = 0; j < 30; j++)
+        for (int j = 0; j < 10; j++)
         {
             trackerStatus[i].pose_delta_history[j].a = 0.0;
             trackerStatus[i].pose_delta_history[j].b = 0.0;
@@ -2218,10 +2218,10 @@ void Tracker::MainLoop()
                     ret >> pose_from_driver.qz;
                     ret >> pose_from_driver.pose_valid;
 
-                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average - trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 30.0;
+                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average - trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 10.0;
                     trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] = compress(pose_from_driver - pose_local);
-                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average + trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 30.0;
-                    if(++trackerStatus[i].pose_delta_index == 30)
+                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average + trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 10.0;
+                    if(++trackerStatus[i].pose_delta_index == 10)
                         trackerStatus[i].pose_delta_index = 0;
 
 #if 0
