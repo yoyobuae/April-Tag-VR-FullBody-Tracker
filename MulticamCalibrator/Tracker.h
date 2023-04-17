@@ -123,6 +123,6 @@ private:
     std::vector<cv::Point3d> calibratorPoints2;
     std::vector<long> calibratorTimes1;
     std::vector<long> calibratorTimes2;
-    int pointsThreshold = 100;
+    int pointsThreshold = 1000;
 
 };

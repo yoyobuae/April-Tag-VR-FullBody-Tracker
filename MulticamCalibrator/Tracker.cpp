@@ -1690,7 +1690,7 @@ void Tracker::MainLoop1()
                     calibratorPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                     calibratorTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
-                    if (calibratorPoints1.size() > 3000 && calibratorPoints2.size() > 3000)
+                    if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
                     {
                         cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                         wtranslation2 = wtranslation * wtranslation2;
@@ -1723,6 +1723,8 @@ void Tracker::MainLoop1()
                         calibratorPoints2.clear();
                         calibratorTimes1.clear();
                         calibratorTimes2.clear();
+                        
+                        pointsThreshold += 1000;
                     }
                 }
             }
@@ -1731,7 +1733,7 @@ void Tracker::MainLoop1()
             {
                 for (int i = 0; i < calibratorProjected1.size(); ++i)
                 {
-                    if (i % 3 != 0)
+                    if (i % 15 != 0)
                         continue;
                     const auto& position = calibratorProjected1[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(0, 255, 255), 2, 8, 0);
@@ -1743,7 +1745,7 @@ void Tracker::MainLoop1()
             {
                 for (int i = 0; i < calibratorReprojected1.size(); ++i)
                 {
-                    if (i % 3 != 0)
+                    if (i % 15 != 0)
                         continue;
                     const auto& position = calibratorReprojected1[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(255, 0, 127), 2, 8, 0);
@@ -2255,7 +2257,7 @@ void Tracker::MainLoop2()
                     calibratorPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                     calibratorTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
-                    if (calibratorPoints1.size() > 3000 && calibratorPoints2.size() > 3000)
+                    if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
                     {
                         cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                         wtranslation2 = wtranslation * wtranslation2;
@@ -2288,6 +2290,8 @@ void Tracker::MainLoop2()
                         calibratorPoints2.clear();
                         calibratorTimes1.clear();
                         calibratorTimes2.clear();
+
+                        pointsThreshold += 1000;
                     }
                 }
             }
@@ -2296,7 +2300,7 @@ void Tracker::MainLoop2()
             {
                 for (int i = 0; i < calibratorProjected2.size(); ++i)
                 {
-                    if (i % 3 != 0)
+                    if (i % 15 != 0)
                         continue;
                     const auto& position = calibratorProjected2[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(0, 255, 255), 2, 8, 0);
@@ -2308,7 +2312,7 @@ void Tracker::MainLoop2()
             {
                 for (int i = 0; i < calibratorReprojected2.size(); ++i)
                 {
-                    if (i % 3 != 0)
+                    if (i % 15 != 0)
                         continue;
                     const auto& position = calibratorReprojected2[i];
                     cv::circle(drawImg, position, 5, cv::Scalar(255, 0, 127), 2, 8, 0);
