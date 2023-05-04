@@ -6,6 +6,8 @@
 #include "IPC/IPC.hpp"
 #include "utils/Enum.hpp"
 
+#include <ios>
+#include <sstream>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -38,7 +40,9 @@ public:
 private:
     void AddTracker(int id, cfg::TrackerRole role)
     {
-        const std::string name = "ApriltagTracker" + std::to_string(id);
+        std::stringstream ss;
+        ss << "ApriltagTracker" << std::hex << id;
+        const std::string name = ss.str();
         std::string roleStr = "TrackerRole_";
         roleStr += utils::renum::ToString(role);
         CmdAddTracker(name, roleStr);
