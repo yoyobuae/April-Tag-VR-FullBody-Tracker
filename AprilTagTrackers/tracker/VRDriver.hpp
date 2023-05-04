@@ -16,7 +16,7 @@ namespace tracker
 class VRDriver
 {
 public:
-    explicit VRDriver(const cfg::List<cfg::TrackerUnit>& trackers);
+    explicit VRDriver(const cfg::List<cfg::TrackerUnit>& trackers, const std::string driverPath);
 
     void UpdateStation(Pose pose) { CmdUpdateStation(0, pose); }
 

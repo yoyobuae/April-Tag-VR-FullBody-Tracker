@@ -66,6 +66,7 @@ public:
     REFLECTABLE_FIELD(cfg::List<cfg::VideoStream>, videoStreams){1};
     REFLECTABLE_FIELD(cfg::List<cfg::TrackerUnit>, trackers){3};
     REFLECTABLE_FIELD(cfg::Validated<int>, detectorThreads){4, cfg::GreaterEqual(1)};
+    REFLECTABLE_FIELD(std::string, ipcAddr) = "ApriltagPipeIn";
     REFLECTABLE_END;
 
     CalibrationConfig calib{};

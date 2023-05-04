@@ -534,7 +534,7 @@ void Tracker::StartTrackerCalib()
 
 void Tracker::StartConnection()
 {
-    mVRDriver = tracker::VRDriver{user_config.trackers};
+    mVRDriver = tracker::VRDriver{user_config.trackers, user_config.ipcAddr};
     if (!user_config.disableOpenVrApi)
     {
         mVRClient = std::make_unique<tracker::OpenVRClient>();

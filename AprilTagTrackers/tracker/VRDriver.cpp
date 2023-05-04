@@ -74,8 +74,8 @@ TEST_CASE("VerifyAndParseResponse")
 namespace tracker
 {
 
-VRDriver::VRDriver(const cfg::List<cfg::TrackerUnit>& trackers)
-    : mBridge(IPC::CreateDriverClient())
+VRDriver::VRDriver(const cfg::List<cfg::TrackerUnit>& trackers, const std::string driverPath)
+    : mBridge(IPC::CreateDriverClient(driverPath))
 {
     // Only add trackers (and station) if they were not already added
     // also checks driver version, ensures can connect

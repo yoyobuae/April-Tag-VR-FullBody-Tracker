@@ -77,9 +77,8 @@ private:
     std::string mSocketPath;
 };
 
-inline std::unique_ptr<IClient> CreateDriverClient()
+inline std::unique_ptr<IClient> CreateDriverClient(const std::string driverPath)
 {
-    const std::string driverPath = "ApriltagPipeIn";
 #ifdef ATT_OS_WINDOWS
     return std::make_unique<WindowsNamedPipe>(driverPath);
 #else
