@@ -78,6 +78,15 @@ public:
         const double frameTimeBeforeDetect = duration_cast<utils::FSeconds>(stampBeforeDetect - frame.timestamp).count();
         for (int i = 0; i < trackerNum; i++)
         {
+            // searchRadius is intended to be the size in meters of the tracker as viewed from the camera's POV.
+            //
+            // To transform from a distance in meters to pixels in camera image one needs to:
+            // * Multiply by the focal length (in pixels)
+            // * Divide by the distance away from camera (in meters)
+            //
+            // To set the initial value for searchRadius we just assume tracker is 1 meter away from camera
+            int searchRadius = static_cast<int>(videoStream->searchWindow * camCalib->cameraMatrix.at<double>(0,0));
+
             auto& unit = (*trackerUnits)[i];
             auto [pose, isValid] = mVRDriver->GetTracker(i, -frameTimeBeforeDetect - videoStream->latency);
 
@@ -89,10 +98,10 @@ public:
             TransformFromBoardToCameraSpace(inBoardSpace, RodrPose(pose), &inCameraSpace);
 
             std::array<cv::Point2d, 3> projected;
+            const std::array<cv::Point3d, 3> points{pose.position, unit.GetEstimatedPose().position, inCameraSpace[0]};
             {
                 const cv::Vec3d unusedRVec{}; // used to perform change of basis
                 const cv::Vec3d unusedTVec{};
-                const std::array<cv::Point3d, 3> points{pose.position, unit.GetEstimatedPose().position, inCameraSpace[0]};
                 cv::projectPoints(points, unusedRVec, unusedTVec, camCalib->cameraMatrix, camCalib->distortionCoeffs, projected);
             }
             const auto& [driverCenter, previousCenter, newCenter] = projected;
@@ -111,10 +120,12 @@ public:
                 if (!unit.WasVisibleLastFrame()) // if tracker was found in previous frame, we use that position for masking. If not, we use position from driver for masking.
                 {
                     maskCenter = driverCenter;
+                    searchRadius = static_cast<int>(videoStream->searchWindow * camCalib->cameraMatrix.at<double>(0,0) / points[0].z);
                 }
                 else
                 {
                     maskCenter = newCenter;
+                    searchRadius = static_cast<int>(videoStream->searchWindow * camCalib->cameraMatrix.at<double>(0,0) / points[2].z);
                 }
                 unit.SetWasVisibleLastFrame(true);
                 unit.SetPoseFromDriver(RodrPose(pose));
@@ -124,6 +135,7 @@ public:
                 if (unit.WasVisibleLastFrame())
                 {
                     maskCenter = previousCenter; // if pose is not valid, set everything based on previous known position
+                    searchRadius = static_cast<int>(videoStream->searchWindow * camCalib->cameraMatrix.at<double>(0,0) / points[1].z);
                 }
             }
 
