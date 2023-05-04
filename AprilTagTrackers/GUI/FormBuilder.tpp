@@ -126,6 +126,7 @@ inline void CheckBoxButton<F>::Create(RefPtr<wxWindow> parent, RefPtr<wxSizer> s
     CreateWidget(parent, label);
     sizer->Add(GetWidget(), flags);
     Bind(wxEVT_CHECKBOX, onChange);
+    GetWidget()->SetValue(initialValue);
 }
 
 template <typename T>

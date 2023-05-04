@@ -193,14 +193,15 @@ template <typename F>
 class CheckBoxButton : public Widget<wxCheckBox>
 {
 public:
-    CheckBoxButton(const wxString& _label, F&& _onChange)
-        : label(_label), onChange(_onChange) {}
+    CheckBoxButton(const wxString& _label, F&& _onChange, bool _initialValue = false)
+        : label(_label), onChange(_onChange), initialValue(_initialValue) {}
 
     void Create(RefPtr<wxWindow> parent, RefPtr<wxSizer> sizer, wxSizerFlags flags = {}) override;
 
 private:
     wxString label;
     const F& onChange;
+    bool initialValue;
 };
 
 /// Label with optional tooltip.

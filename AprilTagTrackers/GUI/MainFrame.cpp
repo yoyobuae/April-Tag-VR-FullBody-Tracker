@@ -238,7 +238,7 @@ void GUI::MainFrame::CreateCameraPage(RefPtr<wxNotebook> pages)
             {
                 config.disableOpenVrApi = evt.IsChecked();
                 config.Save();
-            }})
+            }, config.disableOpenVrApi})
         .Add(Button{lc.CAMERA_CONNECT, [this](auto&)
             {
                 tracker->StartConnection();
