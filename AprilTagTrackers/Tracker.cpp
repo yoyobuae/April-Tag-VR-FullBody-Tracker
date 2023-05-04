@@ -287,7 +287,6 @@ void Tracker::CalibrateCameraCharuco()
         if (std::chrono::duration<double>(std::chrono::steady_clock::now() - timeOfLast).count() > 1)
         {
             // framesSinceLast = 0;
-            timeOfLast = std::chrono::steady_clock::now();
             // if any button was pressed
 
             // detect our markers
@@ -327,6 +326,7 @@ void Tracker::CalibrateCameraCharuco()
                     }
                 }
             }
+            timeOfLast = std::chrono::steady_clock::now();
         }
     }
 
