@@ -76,7 +76,7 @@ void print_usage(char *program_name)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 1)
+    if (argc <= 1)
     {
         print_usage(argv[0]);
         exit(1);
