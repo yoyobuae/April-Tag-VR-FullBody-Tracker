@@ -6,6 +6,9 @@
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
+
+extern int h_errno;
 #endif
 
 #include "Tcp.hpp"
@@ -118,6 +121,18 @@ namespace Tcp {
         ::close(sockfd);
     }
 
+    const char *gethostbyname_error_str()
+    {
+        switch(h_errno)
+        {
+        case HOST_NOT_FOUND: return "The specified host is unknown.";
+        case NO_DATA: return "The  requested  name  is valid but does not have an IP address.  Another type of request to the name server for this domain may return an answer.";
+        case NO_RECOVERY: return "A nonrecoverable name server error occurred.";
+        case TRY_AGAIN: return "A temporary error occurred on an authoritative name server.  Try again later.";
+        }
+        return "(unknown)";
+    }
+
     std::string Client::sendrecv(std::string buffer)
     {
         if (sockfd == -1) {
@@ -130,10 +145,20 @@ namespace Tcp {
 
             // Prepare address
             struct sockaddr_in serv_addr;
+            struct hostent *server;
 
+            server = gethostbyname(host.c_str());
+            if (server == NULL) {
+                fprintf(stderr, "gethostbyname: %s\n", gethostbyname_error_str());
+                close(sockfd);
+                sockfd = -1;
+                return std::string();
+            }
             bzero((char *) &serv_addr, sizeof(serv_addr));
             serv_addr.sin_family = AF_INET;
-            serv_addr.sin_addr.s_addr = INADDR_ANY;
+            bcopy((char *)server->h_addr, 
+                    (char *)&serv_addr.sin_addr.s_addr,
+                    server->h_length);
             serv_addr.sin_port = htons(port);
 
             // Connect
