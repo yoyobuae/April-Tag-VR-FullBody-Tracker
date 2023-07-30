@@ -1,12 +1,11 @@
-#include <sstream>
-
 #if defined(__linux) || defined(__linux__) || defined(linux)
+#include <string.h>
 #include <errno.h>
 #include <stdio.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/un.h>
 #include <unistd.h>
+#include <sys/types.h> 
+#include <sys/socket.h>
+#include <netinet/in.h>
 #endif
 
 #include "Tcp.hpp"
@@ -66,13 +65,6 @@ namespace Tcp {
 
     Connection Server::accept()
     {
-     int sockfd, newsockfd, portno;
-     socklen_t clilen;
-     char buffer[256];
-     struct sockaddr_in serv_addr, cli_addr;
-     int n;
-
-
         struct sockaddr_in cli_addr;
         socklen_t clilen = sizeof(cli_addr);
         int connfd;
@@ -115,7 +107,7 @@ namespace Tcp {
         return ret;
     }
 
-    Client::Client(std::string name) : name(name) { }
+    Client::Client(std::string host, int port) : host(host), port(port) { }
 
     std::string Client::sendrecv(std::string buffer)
     {
@@ -128,19 +120,15 @@ namespace Tcp {
         }
 
         // Prepare address
-        std::stringstream ss;
-        ss << "/tmp/" << name;
-        std::string sockpath = ss.str();
+	struct sockaddr_in serv_addr;
 
-        struct sockaddr_un remote;
-        int t;
-
-        remote.sun_family = AF_UNIX;
-        strcpy(remote.sun_path, sockpath.c_str());
-        len = strlen(remote.sun_path) + sizeof(remote.sun_family);
+	bzero((char *) &serv_addr, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(port);
 
         // Connect
-        if (::connect(sockfd, (struct sockaddr *)&remote, len) == -1) {
+        if (::connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) == -1) {
             perror("connect");
             close(sockfd);
             return std::string();
@@ -195,4 +183,4 @@ namespace Tcp {
 
 #endif
 
-}; // namespace Ipc
+}; // namespace Tcp
