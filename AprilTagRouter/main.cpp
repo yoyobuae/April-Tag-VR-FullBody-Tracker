@@ -12,6 +12,7 @@ Tcp::Server tcpServer;
 void ipcToTcp(std::string ipcPipeName, std::string tcpHost, int tcpPort)
 {
     ipcServer.init(ipcPipeName);
+    Tcp::Client tcpClient(tcpHost, tcpPort);
 
     char buffer[1024];
 
@@ -23,7 +24,6 @@ void ipcToTcp(std::string ipcPipeName, std::string tcpHost, int tcpPort)
         {
             std::string request = buffer;
 
-            Tcp::Client tcpClient(tcpHost, tcpPort);
 
             std::string response = tcpClient.sendrecv(request);
 
@@ -43,15 +43,18 @@ void tcpToIpc(int tcpPort, std::string ipcPipeName)
     {
         Tcp::Connection tcpConnection = tcpServer.accept();
 
-        if (tcpConnection.recv(buffer, sizeof(buffer)))
+        for (;tcpConnection.recv(buffer, sizeof(buffer));)
         {
             std::string request = buffer;
 
-            Ipc::Client ipcClient(ipcPipeName);
+            if (request.length() > 0)
+            {
+                Ipc::Client ipcClient(ipcPipeName);
 
-            std::string response = ipcClient.sendrecv(request);
+                std::string response = ipcClient.sendrecv(request);
 
-            tcpConnection.send(response.c_str(), (response.length() + 1));
+                tcpConnection.send(response.c_str(), (response.length() + 1));
+            }
         }
     }
 

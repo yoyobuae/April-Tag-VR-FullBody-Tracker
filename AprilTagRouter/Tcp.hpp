@@ -58,6 +58,7 @@ namespace Tcp {
     class Client {
         public:
             Client(std::string host, int port);
+            ~Client();
 
             // Copying not allowed
             Client(Client const &) = delete;
@@ -67,7 +68,13 @@ namespace Tcp {
 
         private:
             std::string host;
-	    int port;
+            int port;
+
+#if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
+            // TODO
+#elif defined(__linux) || defined(__linux__) || defined(linux)
+            int sockfd;
+#endif
     };
 
 }; // namespace Ipc

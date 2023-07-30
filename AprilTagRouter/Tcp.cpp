@@ -100,59 +100,77 @@ namespace Tcp {
         int n;
         n = ::recv(connfd, buf, len, 0);
         if (n < 0) {
-            perror("recv");
-            ret = false;
+            if (errno != EINTR)
+            {
+                perror("recv");
+                ret = false;
+            }
+            buf[0] = '\0';
         }
 
         return ret;
     }
 
-    Client::Client(std::string host, int port) : host(host), port(port) { }
+    Client::Client(std::string host, int port) : host(host), port(port), sockfd(-1) { }
+
+    Client::~Client()
+    {
+        ::close(sockfd);
+    }
 
     std::string Client::sendrecv(std::string buffer)
     {
-        // Create socket
-        int sockfd;
+        if (sockfd == -1) {
+            // Create socket
+            if ((sockfd = ::socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+                perror("socket");
+                sockfd = -1;
+                return std::string();
+            }
 
-        if ((sockfd = ::socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-            perror("socket");
-            return std::string();
+            // Prepare address
+            struct sockaddr_in serv_addr;
+
+            bzero((char *) &serv_addr, sizeof(serv_addr));
+            serv_addr.sin_family = AF_INET;
+            serv_addr.sin_addr.s_addr = INADDR_ANY;
+            serv_addr.sin_port = htons(port);
+
+            // Connect
+            if (::connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) == -1) {
+                perror("connect");
+                close(sockfd);
+                sockfd = -1;
+                return std::string();
+            }
         }
 
-        // Prepare address
-	struct sockaddr_in serv_addr;
+        if (sockfd != -1) {
+            // Send
+            if (::send(sockfd, buffer.c_str(), buffer.size() + 1, 0) == -1) {
+                perror("send");
+                close(sockfd);
+                sockfd = -1;
+                return std::string();
+            }
 
-	bzero((char *) &serv_addr, sizeof(serv_addr));
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(port);
+            // Receive
+            char readBuf[BUFSIZE];
+            int t;
 
-        // Connect
-        if (::connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) == -1) {
-            perror("connect");
-            close(sockfd);
-            return std::string();
+            if ((t = ::recv(sockfd, readBuf, BUFSIZE, 0)) > 0) {
+                readBuf[t] = '\0';
+                return std::string(readBuf);
+            }
+            else {
+                perror("recv");
+                close(sockfd);
+                sockfd = -1;
+                return std::string();
+            }
         }
-
-        // Send
-        if (::send(sockfd, buffer.c_str(), buffer.size() + 1, 0) == -1) {
-            perror("send");
-            close(sockfd);
-            return std::string();
-        }
-
-        // Receive
-        char readBuf[BUFSIZE];
-        int t;
-
-        if ((t = ::recv(sockfd, readBuf, BUFSIZE, 0)) > 0) {
-            readBuf[t] = '\0';
-            close(sockfd);
-            return std::string(readBuf);
-        }
-        else {
-            perror("recv");
-            close(sockfd);
+        else
+        {
             return std::string();
         }
     }
