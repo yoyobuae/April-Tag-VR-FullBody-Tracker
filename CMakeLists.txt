@@ -19,6 +19,7 @@ find_library(OPENVR_LIB openvr_api HINTS "${CMAKE_CURRENT_SOURCE_DIR}/openvr/lib
 include (FindPkgConfig)
 pkg_check_modules(EIGEN3 REQUIRED IMPORTED_TARGET eigen3)
 
+
 # Include sub-projects.
 add_subdirectory("wxWidgets" EXCLUDE_FROM_ALL)
 add_subdirectory("apriltag" EXCLUDE_FROM_ALL)
@@ -31,3 +32,9 @@ add_subdirectory("MulticamCalibrator")
 add_dependencies("MulticamCalibrator" "apriltags")
 add_dependencies("MulticamCalibrator" "wxbase" "wxcore" "wxnet")
 add_subdirectory("AprilTagRouter")
+
+message("APRILTAG_INCLUDE_DIR: ${APRILTAG_INCLUDE_DIR}")
+message("OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
+message("OpenCV_LIBS: ${OpenCV_LIBS}")
+message("OPENVR_INCLUDE_DIR: ${OPENVR_INCLUDE_DIR}")
+message("OPENVR_LIB: ${OPENVR_LIB}")
