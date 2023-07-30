@@ -17,7 +17,7 @@ void addTextWithTooltip(wxWindow* parent, wxSizer* sizer, const wxString& label,
 } // namespace
 
 GUI::GUI(const wxString& title, Parameters * params, Connection* conn)
-    : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(650, 650))
+    : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(768, 800))
 {
     wxNotebook* nb = new wxNotebook(this, -1, wxPoint(-1, -1),
         wxSize(-1, -1), wxNB_TOP);

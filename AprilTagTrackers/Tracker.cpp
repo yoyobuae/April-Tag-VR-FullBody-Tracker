@@ -2127,7 +2127,7 @@ void Tracker::MainLoop()
 #endif
 #if 1
             // Reject detected positions that are behind or too far from the camera
-            if ((trackerStatus[i].boardTvec[2]  < 0) || (trackerStatus[i].boardTvec[2]  > 3.0))
+            if ((trackerStatus[i].boardTvec[2]  < 0)) // || (trackerStatus[i].boardTvec[2]  > 3.0))
             {
                 trackerStatus[i].boardFound = false;
                 continue;
