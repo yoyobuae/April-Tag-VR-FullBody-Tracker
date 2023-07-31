@@ -1368,9 +1368,10 @@ void Tracker::MainLoop()
 
     while (mainThreadRunning && cameraRunning)
     {
-
+        // Wait until frame from camera is available and then fetch it
         CopyFreshCameraImageTo(frame);
 
+        // Figure out what would the column and row sizes would be after rotation
         int rotated_cols = image.cols;
         int rotated_rows = image.rows;
         switch (rotateFlag) {
@@ -1390,6 +1391,7 @@ void Tracker::MainLoop()
             trackerStatus[i].pose_valid = -1;
         }
 
+        // Fetch the predicted pose from driver side
         {
             double frameTime = double(clock() - frame.captureTime) / double(CLOCKS_PER_SEC);
 
@@ -1438,6 +1440,7 @@ void Tracker::MainLoop()
 
         frame.getPoseTime = clock();
 
+        // Convert camera frame to grayscale
         drawImg = image;
         cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
         april.convertToSingleChannel(image, gray);
@@ -1448,6 +1451,7 @@ void Tracker::MainLoop()
         //for timing our detection
         start = clock();
 
+        // Preparation to calculate ROI windows
         bool circularWindow = parameters->circularWindow;
 
         for (int i = 0; i < trackerNum; i++)
@@ -1468,6 +1472,7 @@ void Tracker::MainLoop()
             trackerStatus[i].maskCenters.clear();
         }
 
+        // Project the tracker positions onto camera image positions
         for (int i = 0; i < trackerNum; i++)
         {
             cv::Mat rpos = (cv::Mat_<double>(4, 1) << -trackerStatus[i].a, trackerStatus[i].b, -trackerStatus[i].c, 1);
@@ -1560,6 +1565,7 @@ void Tracker::MainLoop()
 
         didMatchTemplate = false;
 
+        // Dumb template matching search in camera image for candidate tracker positions 
         for (int i = 0; i < trackerNum; i++)
         {
             if (!trackerStatus[i].doImageMatching)
@@ -1696,7 +1702,7 @@ void Tracker::MainLoop()
 
         bool doMasking = false;
 
-        //I assume you want to draw the circle at the center of your image, with a radius of 50
+        // Generate the ROI mask image
         for (int i = 0; i < trackerNum; i++)
         {
             for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
@@ -1742,6 +1748,7 @@ void Tracker::MainLoop()
 
         //cv::imshow("test", image);
 
+        // Handle grabbing camera/trackers with VR controllers, for camera position/rotation calibration
         if (manualRecalibrate)
         {
             int inputButton = 0;
@@ -1892,9 +1899,12 @@ void Tracker::MainLoop()
         {
             calibControllerLastPress = clock();
         }
+
+        // Run the apriltag detector
         april.detectMarkers(gray, &corners, &ids, &centers, trackers);
         frame.detectTime = clock();
 
+        // Store a snapshot image of each tracker
         for (int i = 0; i < trackerNum; ++i)
         {
             trackerStatus[i].doImageMatching = false;
@@ -1902,6 +1912,7 @@ void Tracker::MainLoop()
             std::vector<float> trackerXCoords;
             std::vector<float> trackerYCoords;
 
+            // Match found tags to the respective trackers, and store the corner x/y positions
             for (int j = 0; j < ids.size(); j++)        //check all of the found markers
             {
                 if (ids[j] >= i * markersPerTracker && ids[j] < (i + 1) * markersPerTracker)            //if marker is part of current tracker
@@ -1914,6 +1925,7 @@ void Tracker::MainLoop()
                 }
             }
 
+            // Find the bounding rect of tracker and store snapshot
             if (!trackerXCoords.empty() && !trackerYCoords.empty())
             {
                 const auto [leftit, rightit] = std::minmax_element(trackerXCoords.begin(), trackerXCoords.end());
@@ -1941,6 +1953,7 @@ void Tracker::MainLoop()
             }
         }
 
+        // Adjust the detected tag corners x/y coordinates to rotate the image reference frame
         for (int i = 0; i < corners.size(); i++) {
             for (int j = 0; j < corners[i].size(); j++) {
                 auto tmp = corners[i][j].x;
@@ -1961,6 +1974,7 @@ void Tracker::MainLoop()
             }
         }
 
+        // Adjust the detected tag centers x/y coordinates to rotate the image reference frame
         for (int i = 0; i < centers.size(); i++) {
             auto tmp = centers[i].x;
             switch (rotateFlag) {
@@ -1982,8 +1996,7 @@ void Tracker::MainLoop()
         std::chrono::milliseconds current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
         for (int i = 0; i < trackerNum; ++i) {
 
-            //estimate the pose of current board
-
+            // Estimate the pose of current board
             try
             {
                 trackerStatus[i].boardTvec /= calibScale;
@@ -2025,6 +2038,7 @@ void Tracker::MainLoop()
 
             trackerStatus[i].boardTvec *= calibScale;
 
+            // Depth smoothing
             if (parameters->depthSmoothing > 0 && trackerStatus[i].boardFoundDriver && !manualRecalibrate)
             {
                 //depth estimation is noisy, so try to smooth it more, especialy if using multiple cameras
@@ -2063,6 +2077,7 @@ void Tracker::MainLoop()
                 trackerStatus[i].boardRvec[1],
                 trackerStatus[i].boardRvec[2] };
 
+            // Calculate the median of the latest 6 tracker positions (disabled)
             for (int j = 0; j < 6; j++)
             {
                 //push new values into previous values list end and remove the one on beggining
@@ -2089,8 +2104,7 @@ void Tracker::MainLoop()
 
             cv::Mat rpos = cv::Mat_<double>(4, 1);
 
-            //transform boards position based on our calibration data
-
+            // Transform tracker positions/rotations from camera space to driver space
             for (int x = 0; x < 3; x++)
             {
                 rpos.at<double>(x, 0) = trackerStatus[i].boardTvec[x];
@@ -2126,6 +2140,8 @@ void Tracker::MainLoop()
             }
 #endif
 #if 1
+            // Filter tracker positions to remove nonsensical ones
+
             // Reject detected positions that are behind or too far from the camera
             if ((trackerStatus[i].boardTvec[2]  < 0)) // || (trackerStatus[i].boardTvec[2]  > 3.0))
             {
@@ -2166,10 +2182,8 @@ void Tracker::MainLoop()
             end = clock();
             double frameTime = double(end - frame.captureTime) / double(CLOCKS_PER_SEC);
 
-            //send all the values
-            //frame time is how much time passed since frame was acquired.
             if (!multicamAutocalib) {
-
+                // Send tracker positions/rotations to driver
                 TrackerPose pose_local;
                 pose_local.a = a;
                 pose_local.b = b;
@@ -2181,6 +2195,7 @@ void Tracker::MainLoop()
 
                 TrackerPose pose_to_send = pose_local + trackerStatus[i].pose_delta_average;
 
+                //frame time is how much time passed since frame was acquired.
                 std::istringstream ret = connection->SendTracker(connection->connectedTrackers[i].DriverId,
                                                                  pose_to_send.a,
                                                                  pose_to_send.b,
@@ -2194,6 +2209,7 @@ void Tracker::MainLoop()
 
                 // printf("Response from driver: %s\n", ret.str().c_str());
 
+                // Estimate tracker pose offset to minimize mismatch between instances in multi-camera setups
                 do {
                     std::string word;
 
@@ -2279,6 +2295,7 @@ void Tracker::MainLoop()
             }
             else if (trackerStatus[i].boardFoundDriver)
             {
+                // Do automatic secondary camera calibration
                 //get rotations of tracker from camera
 
                 cv::Vec3d pose;
