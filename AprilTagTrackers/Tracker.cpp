@@ -1294,7 +1294,7 @@ void Tracker::MainLoop()
     AprilTagWrapper april{parameters};
 
     int framesSinceLastSeen = 0;
-    int framesToCheckAll = 20;
+    int framesToCheckAll = 3;
 
     cv::Mat stationPos = (cv::Mat_<double>(4, 1) << 0, 0, 0, 1);
     stationPos = wtranslation * stationPos;
@@ -1917,12 +1917,12 @@ void Tracker::MainLoop()
             calibControllerLastPress = clock();
         }
 
-        // Run the apriltag detector
-        if (doMasking && circularWindow) {
-            corners.clear();
-            ids.clear();
-            centers.clear();
+        corners.clear();
+        ids.clear();
+        centers.clear();
 
+        // Run the apriltag detector
+        if (doMasking) {
             for (int i = 0; i < trackerNum; i++)
             {
                 for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
@@ -2013,9 +2013,48 @@ void Tracker::MainLoop()
                 }
             }
         }
-        else
+        if (!(doMasking && circularWindow))
         {
-            april.detectMarkers(gray, &corners, &ids, &centers, trackers);
+            static int quadrant = 0;
+            int left = (quadrant % 4) * gray.cols/4;
+            int top = ((quadrant / 4) % 4) * gray.rows/4;
+            int right = ((quadrant % 4) + 1) * gray.cols/4 - 1;
+            int bottom = (((quadrant / 4) % 4) + 1) * gray.rows/4 - 1;
+
+            cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
+
+            std::vector<int> temp_ids;
+            std::vector<std::vector<cv::Point2f> > temp_corners;
+            std::vector<cv::Point2f> temp_centers;
+
+            april.detectMarkers(cv::Mat(gray, roi), &temp_corners, &temp_ids, &temp_centers, trackers);
+
+            for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
+            {
+                bool alreadyDetected = false;
+                for (int l = 0; l < ids.size(); l++)
+                {
+                    if (temp_ids[k] == ids[l])
+                    {
+                        alreadyDetected = true;
+                        break;
+                    }
+                }
+                if (alreadyDetected)
+                    break;
+                for (int l = 0; l < temp_corners[k].size(); l++)
+                {
+                    temp_corners[k][l].x += left;
+                    temp_corners[k][l].y += top;
+                }
+                temp_centers[k].x += left;
+                temp_centers[k].y += top;
+
+                corners.push_back(temp_corners[k]);
+                ids.push_back(temp_ids[k]);
+                centers.push_back(temp_centers[k]);
+            }
+            quadrant = (quadrant + 1) % 16;
         }
 
         frame.detectTime = clock();
