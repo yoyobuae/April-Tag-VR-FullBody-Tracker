@@ -1365,6 +1365,7 @@ void Tracker::MainLoop()
                    {
                    cv::namedWindow("out");
                    });
+    std::vector<std::function<void(cv::Mat &)>> drawUiFuncs;
 
     while (mainThreadRunning && cameraRunning)
     {
@@ -1520,12 +1521,9 @@ void Tracker::MainLoop()
             cv::projectPoints(point, identity_rvec, identity_tvec, parameters->camMat, parameters->distCoeffs, projected);
 
 
-            circleOnPostRotatedImg(drawImg, projected[0], 5, cv::Scalar(0, 0, 255), rotateFlag, 2, 8, 0);
-            circleOnPostRotatedImg(drawImgMasked, projected[0], 5, cv::Scalar(0, 0, 255), rotateFlag, 2, 8, 0);
-            circleOnPostRotatedImg(drawImg, projected[2], 5, cv::Scalar(0, 255, 255), rotateFlag, 2, 8, 0);
-            circleOnPostRotatedImg(drawImgMasked, projected[2], 5, cv::Scalar(0, 255, 255), rotateFlag, 2, 8, 0);
-            circleOnPostRotatedImg(drawImg, projected[3], 5, cv::Scalar(255, 0, 255), rotateFlag, 2, 8, 0);
-            circleOnPostRotatedImg(drawImgMasked, projected[3], 5, cv::Scalar(255, 0, 255), rotateFlag, 2, 8, 0);
+            drawUiFuncs.push_back([=](cv::Mat &img){circleOnPostRotatedImg(img, projected[0], 5, cv::Scalar(0, 0, 255), rotateFlag, 2, 8, 0); });
+            drawUiFuncs.push_back([=](cv::Mat &img){circleOnPostRotatedImg(img, projected[2], 5, cv::Scalar(0, 255, 255), rotateFlag, 2, 8, 0); });
+            drawUiFuncs.push_back([=](cv::Mat &img){circleOnPostRotatedImg(img, projected[3], 5, cv::Scalar(255, 0, 255), rotateFlag, 2, 8, 0); });
 
             if (trackerStatus[i].pose_valid == 0)
             {
@@ -1670,8 +1668,7 @@ void Tracker::MainLoop()
                 }
 #endif
 
-                cv::rectangle(drawImg, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(0, 0, 255), 3);
-                cv::rectangle(drawImgMasked, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(0, 0, 255), 3);
+                drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(0, 0, 255), 3); });
 
                 cv::Point2f center = cv::Point2f((left + right)/2, (top + bottom)/2);
 
@@ -1718,8 +1715,7 @@ void Tracker::MainLoop()
                     if (trackerStatus[i].searchSize > 0)
                     {
                         circleOnPostRotatedImg(mask, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, -1, 8, 0);
-                        circleOnPostRotatedImg(drawImg, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
-                        circleOnPostRotatedImg(drawImgMasked, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0);
+                        drawUiFuncs.push_back([=](cv::Mat &img){circleOnPostRotatedImg(img, trackerStatus[i].maskCenters[j], trackerStatus[i].searchSize, cv::Scalar(255, 0, 0), rotateFlag, 2, 8, 0); });
                     }
                 }
                 else
@@ -1730,8 +1726,7 @@ void Tracker::MainLoop()
                         cv::Point bottomRight = cv::Point(trackerStatus[i].maskCenters[j].x + trackerStatus[i].searchSize, rotated_rows);
 
                         rectangleOnPostRotatedImg(mask, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, -1);
-                        rectangleOnPostRotatedImg(drawImg, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
-                        rectangleOnPostRotatedImg(drawImgMasked, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3);
+                        drawUiFuncs.push_back([=](cv::Mat &img){rectangleOnPostRotatedImg(img, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3); });
                     }
                 }
             }
@@ -2115,8 +2110,7 @@ void Tracker::MainLoop()
             //convert rodriguez rotation to quaternion
             Quaternion<double> q = rodr2quat(trackerStatus[i].boardRvec[0], trackerStatus[i].boardRvec[1], trackerStatus[i].boardRvec[2]);
 
-            drawAxisOnPostRotatedImg(drawImg, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05, rotateFlag);
-            drawAxisOnPostRotatedImg(drawImgMasked, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05, rotateFlag);
+            drawUiFuncs.push_back([=](cv::Mat &img) mutable {drawAxisOnPostRotatedImg(img, parameters->camMat, parameters->distCoeffs, trackerStatus[i].boardRvec, trackerStatus[i].boardTvec, 0.05, rotateFlag); });
 
             q = Quaternion<double>(0, 0, 1, 0) * (wrotation * q) * Quaternion<double>(0, 0, 1, 0);
 
@@ -2385,73 +2379,82 @@ void Tracker::MainLoop()
             }
         }
 
-        {
-            cv::Mat mask = cv::Mat::zeros(image.size(), image.type());
-
-            for (int i = 0; i < corners.size(); i++)
-            {
-                std::vector<cv::Point> points;
-                for(int j = 0; j < corners[i].size(); j++){
-                    points.push_back(corners[i].at(j));
-                }
-                cv::fillConvexPoly(mask, points, cv::Scalar(255, 255, 255), 8, 0);
-            }
-
-            drawImg.copyTo(drawImgMasked, mask);
-        }
-
-
-        if (ids.size() > 0) {
-            cv::aruco::drawDetectedMarkers(drawImg, corners, ids);
-            cv::aruco::drawDetectedMarkers(drawImgMasked, corners, ids);
-        }
-
-        end = clock();
-        double frameTime = double(end - start) / double(CLOCKS_PER_SEC);
-
-        if (showTimeProfile)
-        {
-            cv::Mat *outImg = new cv::Mat();
-
-            int frameWriteMsecs = int(20000.0 * double(frame.swapTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-            int frameReadMsecs = int(20000.0 * double(frame.copyFreshTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-            int getPoseMsecs = int(20000.0 * double(frame.getPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-            int toGrayMsecs = int(20000.0 * double(frame.toGrayTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-            int processPoseMsecs = int(20000.0 * double(frame.processPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-            int doMaskMsecs = int(20000.0 * double(frame.doMaskTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-            int detectMsecs = int(20000.0 * double(frame.detectTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-            int sendTrackerMsecs = int(20000.0 * double(frame.sendTrackerTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-
-            rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows), cv::Scalar(0, 0, 0), -1);                        // Clear
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs), cv::Scalar(133, 178, 208), -1);// Light Brown
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs), cv::Scalar(23, 73, 207), -1);   // Orange
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs), cv::Scalar(51, 140, 117), -1);     // Green
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs), cv::Scalar(20, 89, 152), -1); // Brown
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);     // Green
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - detectMsecs),      cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
-
-            if (statsCurX % 20 > 15) {
-                for (int y = 99 ; y < 1000; y += 100) {
-                    rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - y),  cv::Point(statsCurX + 2, statsImg.rows - y + 2), cv::Scalar(0, 0, 0), -1);
-                }
-            }
-
-            statsCurX += 3;
-            statsCurX = (statsCurX >= 2000) ? 0 : statsCurX;
-
-            statsImg.copyTo(*outImg);
-            gui->CallAfter([outImg] ()
-                           {
-                           cv::imshow("stats", *outImg);
-                           cv::waitKey(1);
-                           delete(outImg);
-                           });
-        }
-
         if (!disableOut)
         {
+            drawImg = image;
+            cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
+
+            if (privacyMode)
+            {
+                cv::Mat mask = cv::Mat::zeros(image.size(), image.type());
+
+                for (int i = 0; i < corners.size(); i++)
+                {
+                    std::vector<cv::Point> points;
+                    for(int j = 0; j < corners[i].size(); j++){
+                        points.push_back(corners[i].at(j));
+                    }
+                    cv::fillConvexPoly(mask, points, cv::Scalar(255, 255, 255), 8, 0);
+                }
+
+                drawImg.copyTo(drawImgMasked, mask);
+                drawImg = drawImgMasked;
+            }
+
+            for (auto f : drawUiFuncs)
+            {
+                f(drawImg);
+            }
+
+
+            if (ids.size() > 0) {
+                cv::aruco::drawDetectedMarkers(drawImg, corners, ids);
+            }
+
+            end = clock();
+            double frameTime = double(end - start) / double(CLOCKS_PER_SEC);
+
+            if (showTimeProfile)
+            {
+                cv::Mat *outImg = new cv::Mat();
+
+                int frameWriteMsecs = int(20000.0 * double(frame.swapTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int frameReadMsecs = int(20000.0 * double(frame.copyFreshTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int getPoseMsecs = int(20000.0 * double(frame.getPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int toGrayMsecs = int(20000.0 * double(frame.toGrayTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int processPoseMsecs = int(20000.0 * double(frame.processPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int doMaskMsecs = int(20000.0 * double(frame.doMaskTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int detectMsecs = int(20000.0 * double(frame.detectTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int sendTrackerMsecs = int(20000.0 * double(frame.sendTrackerTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+
+                rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows), cv::Scalar(0, 0, 0), -1);                        // Clear
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs), cv::Scalar(133, 178, 208), -1);// Light Brown
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs), cv::Scalar(23, 73, 207), -1);   // Orange
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs), cv::Scalar(51, 140, 117), -1);     // Green
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs), cv::Scalar(20, 89, 152), -1); // Brown
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);     // Green
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - detectMsecs),      cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
+
+                if (statsCurX % 20 > 15) {
+                    for (int y = 99 ; y < 1000; y += 100) {
+                        rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - y),  cv::Point(statsCurX + 2, statsImg.rows - y + 2), cv::Scalar(0, 0, 0), -1);
+                    }
+                }
+
+                statsCurX += 3;
+                statsCurX = (statsCurX >= 2000) ? 0 : statsCurX;
+
+                statsImg.copyTo(*outImg);
+                gui->CallAfter([outImg] ()
+                               {
+                               cv::imshow("stats", *outImg);
+                               cv::waitKey(1);
+                               delete(outImg);
+                               });
+            }
+
             int cols, rows;
             if (image.cols < image.rows)
             {
@@ -2464,10 +2467,7 @@ void Tracker::MainLoop()
                 rows = image.rows * drawImgSize / image.cols;
             }
             cv::Mat *outImg = new cv::Mat();
-            if (privacyMode)
-                cv::resize(drawImgMasked, *outImg, cv::Size(cols, rows));
-            else
-                cv::resize(drawImg, *outImg, cv::Size(cols, rows));
+            cv::resize(drawImg, *outImg, cv::Size(cols, rows));
             cv::putText(*outImg, std::to_string(frameTime).substr(0, 5), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255));
             if (showTimeProfile)
             {
@@ -2490,6 +2490,7 @@ void Tracker::MainLoop()
                            delete(outMatchTemplateResult);
                            });
         }
+        drawUiFuncs.clear();
         //time of marker detection
     }
     gui->CallAfter([] ()
