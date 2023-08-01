@@ -2244,7 +2244,7 @@ void Tracker::MainLoop()
                            q.y,
                            q.z);
 #endif
-#if 1
+#if 0
                     printf("sent: % 3.3f % 3.3f % 3.3f q: % 3.3f % 3.3f % 3.3f % 3.3f ",
                            pose_to_send.a,
                            pose_to_send.b,
@@ -2254,7 +2254,7 @@ void Tracker::MainLoop()
                            pose_to_send.qy,
                            pose_to_send.qz);
 #endif
-#if 1
+#if 0
                     printf("driver: % 3.3f % 3.3f % 3.3f q: % 3.3f % 3.3f % 3.3f % 3.3f valid: %d ",
                            pose_from_driver.a,
                            pose_from_driver.b,
@@ -2275,6 +2275,7 @@ void Tracker::MainLoop()
                            q.y - trackerStatusInDriver.qy,
                            q.z - trackerStatusInDriver.qz);
 #endif
+#if 0
                     printf("average: % 3.4f % 3.4f % 3.4f q: % 3.4f % 3.4f % 3.4f % 3.4f\n",
                            trackerStatus[i].pose_delta_average.a,
                            trackerStatus[i].pose_delta_average.b,
@@ -2283,6 +2284,7 @@ void Tracker::MainLoop()
                            trackerStatus[i].pose_delta_average.qx,
                            trackerStatus[i].pose_delta_average.qy,
                            trackerStatus[i].pose_delta_average.qz);
+#endif
 
                 } while (false);
 
