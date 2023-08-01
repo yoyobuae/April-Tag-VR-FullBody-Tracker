@@ -1002,6 +1002,7 @@ void Tracker::CalibrateTracker()
     std::vector<int> idsList;
     std::vector<std::vector < std::vector<cv::Point3f >>> cornersList;
 
+
     trackers.clear();
 
     while (cameraRunning && mainThreadRunning)
@@ -1442,8 +1443,6 @@ void Tracker::MainLoop()
         frame.getPoseTime = clock();
 
         // Convert camera frame to grayscale
-        drawImg = image;
-        cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
         april.convertToSingleChannel(image, gray);
 
         frame.toGrayTime = clock();
@@ -1519,7 +1518,6 @@ void Tracker::MainLoop()
             cv::Vec3d identity_rvec, identity_tvec;
 
             cv::projectPoints(point, identity_rvec, identity_tvec, parameters->camMat, parameters->distCoeffs, projected);
-
 
             drawUiFuncs.push_back([=](cv::Mat &img){circleOnPostRotatedImg(img, projected[0], 5, cv::Scalar(0, 0, 255), rotateFlag, 2, 8, 0); });
             drawUiFuncs.push_back([=](cv::Mat &img){circleOnPostRotatedImg(img, projected[2], 5, cv::Scalar(0, 255, 255), rotateFlag, 2, 8, 0); });
@@ -1688,14 +1686,34 @@ void Tracker::MainLoop()
                     break;
                 }
 
+                bool shouldSkip = false;
+                for (int k = 0; k < trackerNum; k++)
+                {
+                    for (int l = 0; l < trackerStatus[i].maskCenters.size(); l++)
+                    {
+                        if ((fabs(trackerStatus[i].maskCenters[j].x - center.x) < 0.3*trackerStatus[i].searchSize) &&
+                            (fabs(trackerStatus[i].maskCenters[j].y - center.y) < 0.3*trackerStatus[i].searchSize))
+                        {
+                            shouldSkip = true;
+                            break;
+                        }
+                    }
+                    if (shouldSkip)
+                        break;
+                }
+                if (shouldSkip)
+                    break;
+
                 trackerStatus[i].maskCenters.push_back(center);
             }
         }
 
         //Then define your mask image
+#if 0
         cv::Mat mask = cv::Mat::zeros(gray.size(), gray.type());
 
         cv::Mat dstImage = cv::Mat::zeros(gray.size(), gray.type());
+#endif
 
         bool doMasking = false;
 
@@ -1710,6 +1728,7 @@ void Tracker::MainLoop()
                     continue;
                 }
                 doMasking = true;
+#if 0
                 if (circularWindow)
                 {
                     if (trackerStatus[i].searchSize > 0)
@@ -1729,15 +1748,18 @@ void Tracker::MainLoop()
                         drawUiFuncs.push_back([=](cv::Mat &img){rectangleOnPostRotatedImg(img, topLeft, bottomRight, cv::Scalar(255, 0, 0), rotateFlag, 3); });
                     }
                 }
+#endif
             }
         }
 
         //Now you can copy your source image to destination image with masking
+#if 0
         if (doMasking)
         {
             gray.copyTo(dstImage, mask);
             gray = dstImage;
         }
+#endif
 
         frame.doMaskTime = clock();
 
@@ -1896,7 +1918,106 @@ void Tracker::MainLoop()
         }
 
         // Run the apriltag detector
-        april.detectMarkers(gray, &corners, &ids, &centers, trackers);
+        if (doMasking && circularWindow) {
+            corners.clear();
+            ids.clear();
+            centers.clear();
+
+            for (int i = 0; i < trackerNum; i++)
+            {
+                for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
+                {
+                    if (trackerStatus[i].maskCenters[j].x <= 0 ||
+                        trackerStatus[i].maskCenters[j].y <= 0 ||
+                        trackerStatus[i].maskCenters[j].x >= rotated_cols ||
+                        trackerStatus[i].maskCenters[j].y >= rotated_rows)
+                    {
+                        continue;
+                    }
+                    if (trackerStatus[i].searchSize > 0)
+                    {
+                        auto left = trackerStatus[i].maskCenters[j].x - trackerStatus[i].searchSize;
+                        auto top = trackerStatus[i].maskCenters[j].y - trackerStatus[i].searchSize;
+                        auto right = trackerStatus[i].maskCenters[j].x + trackerStatus[i].searchSize;
+                        auto bottom = trackerStatus[i].maskCenters[j].y + trackerStatus[i].searchSize;
+
+                        auto left_tmp = left;
+                        auto top_tmp = top;
+
+                        switch (rotateFlag) {
+                        case cv::ROTATE_180:
+                            left = gray.cols - right;
+                            top = gray.rows - bottom;
+                            right = gray.cols - left_tmp;
+                            bottom = gray.rows - top_tmp;
+                            break;
+                        case cv::ROTATE_90_CLOCKWISE:
+                            left = top;
+                            top = gray.rows - right;
+                            right = bottom;
+                            bottom = gray.rows - left_tmp;
+                            break;
+                        case cv::ROTATE_90_COUNTERCLOCKWISE:
+                            left = gray.cols - bottom;
+                            bottom = right;
+                            right = gray.cols - top;
+                            top = left_tmp;
+                            break;
+                        }
+
+                        left   = (left   >= gray.cols) ? (gray.cols - 1) : ((left   < 0) ? 0 : left);
+                        right  = (right  >= gray.cols) ? (gray.cols - 1) : ((right  < 0) ? 0 : right);
+                        top    = (top    >= gray.rows) ? (gray.rows - 1) : ((top    < 0) ? 0 : top);
+                        bottom = (bottom >= gray.rows) ? (gray.rows - 1) : ((bottom < 0) ? 0 : bottom);
+
+                        cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
+
+                        std::vector<int> temp_ids;
+                        std::vector<std::vector<cv::Point2f> > temp_corners;
+                        std::vector<cv::Point2f> temp_centers;
+
+                        const int w = static_cast<int>(right - left), h = static_cast<int>(bottom - top);
+
+                        if ((w >= 8) && (h >= 8))
+                        {
+                            april.detectMarkers(cv::Mat(gray, roi), &temp_corners, &temp_ids, &temp_centers, trackers);
+                            drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 255, 255), 3); });
+
+                            for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
+                            {
+                                bool alreadyDetected = false;
+                                for (int l = 0; l < ids.size(); l++)
+                                {
+                                    if (temp_ids[k] == ids[l])
+                                    {
+                                        alreadyDetected = true;
+                                        break;
+                                    }
+                                }
+                                if (alreadyDetected)
+                                    break;
+                                for (int l = 0; l < temp_corners[k].size(); l++)
+                                {
+                                    temp_corners[k][l].x += left;
+                                    temp_corners[k][l].y += top;
+                                }
+                                temp_centers[k].x += left;
+                                temp_centers[k].y += top;
+
+                                corners.push_back(temp_corners[k]);
+                                ids.push_back(temp_ids[k]);
+                                centers.push_back(temp_centers[k]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            april.detectMarkers(gray, &corners, &ids, &centers, trackers);
+        }
+
         frame.detectTime = clock();
 
         // Store a snapshot image of each tracker
