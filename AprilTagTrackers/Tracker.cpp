@@ -595,7 +595,7 @@ void Tracker::CalibrateCameraCharuco()
                         });
 
         //framesSinceLast++;
-        if (key != -1 || double(clock() - timeOfLast) / (2*double(CLOCKS_PER_SEC)) > 1)
+        if (key != -1 || double(clock() - timeOfLast) / (5*double(CLOCKS_PER_SEC)) > 1)
         {
             //framesSinceLast = 0;
             //if any button was pressed
