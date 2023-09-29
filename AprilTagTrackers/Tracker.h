@@ -82,6 +82,7 @@ struct TrackerStatus {
     bool boardFound, boardFoundDriver;
     std::vector<std::vector<double>> prevLocValues;
     std::vector<cv::Point2d> maskCenters;
+    std::vector<int> maskSizes;
     std::chrono::milliseconds last_update_timestamp;
     int searchSize;
     int pose_valid;

@@ -1470,6 +1470,7 @@ void Tracker::MainLoop()
         for (int i = 0; i < trackerNum; i++)
         {
             trackerStatus[i].maskCenters.clear();
+            trackerStatus[i].maskSizes.clear();
         }
 
         // Project the tracker positions onto camera image positions
@@ -1530,11 +1531,13 @@ void Tracker::MainLoop()
                 {
                     trackerStatus[i].maskCenters.push_back(projected[2]);
                     trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[2].z);
+                    trackerStatus[i].maskSizes.push_back(trackerStatus[i].searchSize);
                 }
                 else
                 {
                     trackerStatus[i].maskCenters.push_back(projected[3]);
                     trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[3].z);
+                    trackerStatus[i].maskSizes.push_back(trackerStatus[i].searchSize);
                 }
 
                 trackerStatus[i].boardFound = true;
@@ -1550,6 +1553,7 @@ void Tracker::MainLoop()
                 {
                     trackerStatus[i].maskCenters.push_back(projected[3]);
                     trackerStatus[i].searchSize = (int)(parameters->searchWindow*parameters->camMat.at<double>(0,0)/point[3].z);
+                    trackerStatus[i].maskSizes.push_back(trackerStatus[i].searchSize);
                 }
 
                 trackerStatus[i].boardFoundDriver = false;        //do we really need to do this? test later
@@ -1686,25 +1690,60 @@ void Tracker::MainLoop()
                     break;
                 }
 
-                bool shouldSkip = false;
+                bool shouldMerge = false;
+                int trackerIndex = -1;
+                int maskIndex = -1;
                 for (int k = 0; k < trackerNum; k++)
                 {
                     for (int l = 0; l < trackerStatus[k].maskCenters.size(); l++)
                     {
-                        if ((fabs(trackerStatus[k].maskCenters[l].x - center.x) < 0.3*trackerStatus[k].searchSize) &&
-                            (fabs(trackerStatus[k].maskCenters[l].y - center.y) < 0.3*trackerStatus[k].searchSize))
+                        if ((fabs(trackerStatus[k].maskCenters[l].x - center.x) < trackerStatus[k].maskSizes[l]) &&
+                            (fabs(trackerStatus[k].maskCenters[l].y - center.y) < trackerStatus[k].maskSizes[l]))
                         {
-                            shouldSkip = true;
+                            trackerIndex = k;
+                            maskIndex = l;
+                            shouldMerge = true;
                             break;
                         }
                     }
-                    if (shouldSkip)
+                    if (shouldMerge)
                         break;
                 }
-                if (shouldSkip)
-                    break;
+                if (shouldMerge)
+                {
+                    const int k = trackerIndex;
+                    const int l = maskIndex;
 
-                trackerStatus[i].maskCenters.push_back(center);
+                    std::vector<double> XCoords = {
+                        center.x + trackerStatus[i].searchSize,
+                        center.x - trackerStatus[i].searchSize,
+                        trackerStatus[k].maskCenters[l].x + trackerStatus[k].maskSizes[l],
+                        trackerStatus[k].maskCenters[l].x - trackerStatus[k].maskSizes[l] };
+                    std::vector<double> YCoords = {
+                        center.y + trackerStatus[i].searchSize,
+                        center.y - trackerStatus[i].searchSize,
+                        trackerStatus[k].maskCenters[l].y + trackerStatus[k].maskSizes[l],
+                        trackerStatus[k].maskCenters[l].y - trackerStatus[k].maskSizes[l] };
+
+                    const auto [leftit, rightit] = std::minmax_element(XCoords.begin(), XCoords.end());
+                    const auto [topit, bottomit] = std::minmax_element(YCoords.begin(), YCoords.end());
+
+                    auto left = *leftit;
+                    auto top = *topit;
+                    auto right = *rightit;
+                    auto bottom = *bottomit;
+
+                    const int x = static_cast<int>(left), y = static_cast<int>(top);
+                    const int w = static_cast<int>(right - left), h = static_cast<int>(bottom - top);
+
+                    trackerStatus[k].maskCenters[l] = cv::Point2f((left + right)/2, (top + bottom)/2);
+                    trackerStatus[k].maskSizes[l] = std::max(w, h)/2;
+                }
+                else
+                {
+                    trackerStatus[i].maskCenters.push_back(center);
+                    trackerStatus[i].maskSizes.push_back(trackerStatus[i].searchSize);
+                }
             }
         }
 
@@ -1936,10 +1975,10 @@ void Tracker::MainLoop()
                     }
                     if (trackerStatus[i].searchSize > 0)
                     {
-                        auto left = trackerStatus[i].maskCenters[j].x - trackerStatus[i].searchSize;
-                        auto top = trackerStatus[i].maskCenters[j].y - trackerStatus[i].searchSize;
-                        auto right = trackerStatus[i].maskCenters[j].x + trackerStatus[i].searchSize;
-                        auto bottom = trackerStatus[i].maskCenters[j].y + trackerStatus[i].searchSize;
+                        auto left = trackerStatus[i].maskCenters[j].x - trackerStatus[i].maskSizes[j];
+                        auto top = trackerStatus[i].maskCenters[j].y - trackerStatus[i].maskSizes[j];
+                        auto right = trackerStatus[i].maskCenters[j].x + trackerStatus[i].maskSizes[j];
+                        auto bottom = trackerStatus[i].maskCenters[j].y + trackerStatus[i].maskSizes[j];
 
                         auto left_tmp = left;
                         auto top_tmp = top;
