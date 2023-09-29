@@ -1981,7 +1981,7 @@ void Tracker::MainLoop()
                         if ((w >= 8) && (h >= 8))
                         {
                             april.detectMarkers(cv::Mat(gray, roi), &temp_corners, &temp_ids, &temp_centers, trackers);
-                            drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 255, 255), 3); });
+                            drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
 
                             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
                             {
