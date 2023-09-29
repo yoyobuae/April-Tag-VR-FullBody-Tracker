@@ -1689,10 +1689,10 @@ void Tracker::MainLoop()
                 bool shouldSkip = false;
                 for (int k = 0; k < trackerNum; k++)
                 {
-                    for (int l = 0; l < trackerStatus[i].maskCenters.size(); l++)
+                    for (int l = 0; l < trackerStatus[k].maskCenters.size(); l++)
                     {
-                        if ((fabs(trackerStatus[i].maskCenters[j].x - center.x) < 0.3*trackerStatus[i].searchSize) &&
-                            (fabs(trackerStatus[i].maskCenters[j].y - center.y) < 0.3*trackerStatus[i].searchSize))
+                        if ((fabs(trackerStatus[k].maskCenters[l].x - center.x) < 0.3*trackerStatus[k].searchSize) &&
+                            (fabs(trackerStatus[k].maskCenters[l].y - center.y) < 0.3*trackerStatus[k].searchSize))
                         {
                             shouldSkip = true;
                             break;
