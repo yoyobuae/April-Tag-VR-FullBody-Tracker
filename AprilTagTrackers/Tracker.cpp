@@ -1320,8 +1320,8 @@ void Tracker::MainLoop()
 
     FrameData frame;
     cv::Mat drawImg, ycc, gray, cr;
-
-    cv::Mat  prevImg;
+    cv::Mat searchGray;
+    cv::Mat prevSearchGray;
 
     cv::Mat matchTemplateResult;
     bool didMatchTemplate = false;
@@ -1517,6 +1517,11 @@ void Tracker::MainLoop()
         //                true,
         //                false, 1, 1,
         //                false, cv::Rect());
+        frame.getImage(searchGray,
+                       true,
+                       true, 1, 8,
+                       false, cv::Rect());
+
 
         frame.toGrayTime = clock();
 
@@ -1654,19 +1659,15 @@ void Tracker::MainLoop()
             searchTop    = (searchTop    >= frame.rows()) ? (frame.rows() - 1) : ((searchTop    < 0) ? 0 : searchTop);
             searchBottom = (searchBottom >= frame.rows()) ? (frame.rows() - 1) : ((searchBottom < 0) ? 0 : searchBottom);
 
-            const int x = searchLeft, y = searchTop;
-            const int w = searchRight - searchLeft, h = searchBottom - searchTop;
+            const int x = searchLeft / 8, y = searchTop / 8;
+            const int w = (searchRight - searchLeft) / 8, h = (searchBottom - searchTop) / 8;
 
-            if ((w <= 8*trackerStatus[i].snapshot.cols) || (h <= 8*trackerStatus[i].snapshot.rows))
+            if ((w <= trackerStatus[i].oldRoi.width) || (h <= trackerStatus[i].oldRoi.height))
                 continue;
 
-            cv::Mat searchGray;
-            frame.getImage(searchGray,
-                           true,
-                           true, 1, 8,
-                           true, cv::Rect(x, y, w, h));
-
-            cv::matchTemplate(searchGray, trackerStatus[i].snapshot, matchTemplateResult, cv::TM_CCOEFF);
+            cv::matchTemplate(cv::Mat(searchGray, cv::Rect(x, y, w, h)),
+                              cv::Mat(prevSearchGray, trackerStatus[i].oldRoi),
+                              matchTemplateResult, cv::TM_CCOEFF);
             didMatchTemplate = true;
 
             float min = 0.0f, max = 0.0f;
@@ -1723,8 +1724,8 @@ void Tracker::MainLoop()
 #endif
                 int left   = 8*static_cast<int>(centroids.at<double>(j,0)) + searchLeft;
                 int top    = 8*static_cast<int>(centroids.at<double>(j,1)) + searchTop;
-                int right  = left + 8*trackerStatus[i].snapshot.cols;
-                int bottom = top  + 8*trackerStatus[i].snapshot.rows;
+                int right  = left + 8*trackerStatus[i].oldRoi.width;
+                int bottom = top  + 8*trackerStatus[i].oldRoi.height;
 
 #if 0
                 static bool foo = true;
@@ -2226,15 +2227,14 @@ void Tracker::MainLoop()
 
                 if ((w >= 8) && (h >= 8))
                 {
-                    frame.getImage(trackerStatus[i].snapshot,
-                                   true,
-                                   true, 1, 8,
-                                   true, cv::Rect(x, y, w, h));
                     trackerStatus[i].doImageMatching = true;
                     trackerStatus[i].oldCenter = cv::Point2f((left + right)/2, (top + bottom)/2);
+                    trackerStatus[i].oldRoi = cv::Rect(x, y, w, h);
                 }
             }
         }
+
+        searchGray.copyTo(prevSearchGray);
 
         // Adjust the detected tag corners x/y coordinates to rotate the image reference frame
         for (int i = 0; i < corners.size(); i++) {
