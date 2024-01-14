@@ -98,10 +98,11 @@ struct TrackerStatus {
 };
 
 
-struct FrameData
+class FrameData
 {
-    bool ready = false;
     cv::Mat image;
+public:
+    bool ready = false;
     clock_t captureTime;
     clock_t swapTime;
     clock_t copyFreshTime;
@@ -111,6 +112,17 @@ struct FrameData
     clock_t doMaskTime;
     clock_t detectTime;
     clock_t sendTrackerTime;
+
+    void swap(cv::Mat &other);
+    void swap(FrameData &other);
+    void getImage(cv::Mat &out,
+                  bool grayscale,
+                  bool scale, int scale_num, int scale_denom,
+                  bool useRoi, const cv::Rect &roi);
+    cv::Size size() const;
+    int flags() const;
+    int rows() const;
+    int cols() const;
 };
 
 

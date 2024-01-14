@@ -162,6 +162,64 @@ void previewCalibration(cv::Mat& drawImg, Parameters* parameters)
 
 } // namespace
 
+void FrameData::swap(cv::Mat &other)
+{
+    cv::swap(image, other);
+}
+
+void FrameData::swap(FrameData &other)
+{
+    cv::swap(image, other.image);
+}
+
+void FrameData::getImage(cv::Mat &out, bool grayscale, bool scale, int scale_num, int scale_denom, bool useRoi, const cv::Rect &roi)
+{
+    cv::Mat src;
+
+    if (useRoi) {
+        src = cv::Mat(image, roi);
+    } else {
+        src = image;
+    }
+    if (grayscale) {
+        if (scale) {
+            cv::Mat resized;
+            double scale = (double)scale_num/(double)scale_denom;
+            cv::resize(src, resized, cv::Size(), scale, scale, cv::INTER_NEAREST);
+            cvtColor(resized, out, cv::COLOR_BGR2GRAY);
+        } else {
+            cvtColor(src, out, cv::COLOR_BGR2GRAY);
+        }
+    } else {
+        if (scale) {
+            double scale = (double)scale_num/(double)scale_denom;
+            cv::resize(out, src, cv::Size(), scale, scale, cv::INTER_NEAREST);
+        } else {
+            out = src;
+        }
+    }
+}
+
+cv::Size FrameData::size() const
+{
+    return image.size();
+}
+
+int FrameData::flags() const
+{
+    return image.flags;
+}
+
+int FrameData::rows() const
+{
+    return image.rows;
+}
+
+int FrameData::cols() const
+{
+    return image.cols;
+}
+
 Tracker::Tracker(Parameters* params, Connection* conn, MyApp* app)
 {
     parameters = params;
@@ -363,8 +421,9 @@ void Tracker::CameraLoop()
             std::unique_lock<std::mutex> lock(cameraFrameMutex);
             // Swap avoids copying the pixel buffer. It only swaps pointers and metadata.
             // The pixel buffer from cameraImage can be reused if the size and format matches.
-            cv::swap(img, cameraFrame.image);
-            if (img.size() != cameraFrame.image.size() || img.flags != cameraFrame.image.flags)
+
+            cameraFrame.swap(img);
+            if (img.size() != cameraFrame.size() || img.flags != cameraFrame.flags())
             {
                 img.release();
             }
@@ -413,12 +472,12 @@ void Tracker::CopyFreshCameraImageTo(FrameData& frame)
             cameraFrame.ready = false;
             frame.ready = true;
             // Swap metadata and pointers to pixel buffers.
-            cv::swap(frame.image, cameraFrame.image);
+            frame.swap(cameraFrame);
             // We don't want to overwrite shared data so release the image unless we are the only user of it.
-            if (!(cameraFrame.image.u && cameraFrame.image.u->refcount == 1))
-            {
-                cameraFrame.image.release();
-            }
+            // if (!(cameraFrame.image.u && cameraFrame.image.u->refcount == 1))
+            // {
+            //     cameraFrame.image.release();
+            // }
             frame.captureTime = cameraFrame.captureTime;
             frame.swapTime = cameraFrame.swapTime;
             frame.copyFreshTime = clock();
@@ -478,7 +537,7 @@ void Tracker::CalibrateCameraCharuco()
     //function to calibrate our camera
 
     FrameData frame;
-    cv::Mat &image = frame.image;
+    cv::Mat image;
     cv::Mat gray;
     cv::Mat drawImg;
 
@@ -525,6 +584,10 @@ void Tracker::CalibrateCameraCharuco()
     while(mainThreadRunning && cameraRunning)
     {
         CopyFreshCameraImageTo(frame);
+        frame.getImage(image,
+                       false,
+                       false, 1, 1,
+                       false, cv::Rect());
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -770,7 +833,7 @@ void Tracker::CalibrateCamera()
     bool success;
 
     FrameData frame;
-    cv::Mat &image = frame.image;
+    cv::Mat image;
 
     int i = 0;
     int framesSinceLast = -100;
@@ -788,6 +851,10 @@ void Tracker::CalibrateCamera()
             return;
         }
         CopyFreshCameraImageTo(frame);
+        frame.getImage(image,
+                       false,
+                       false, 1, 1,
+                       false, cv::Rect());
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -996,7 +1063,7 @@ void Tracker::CalibrateTracker()
         boardTvec.push_back(cv::Vec3d());
     }
     FrameData frame;
-    cv::Mat &image = frame.image;
+    cv::Mat image;
     cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
 
     std::vector<int> idsList;
@@ -1008,6 +1075,10 @@ void Tracker::CalibrateTracker()
     while (cameraRunning && mainThreadRunning)
     {
         CopyFreshCameraImageTo(frame);
+        frame.getImage(image,
+                       false,
+                       false, 1, 1,
+                       false, cv::Rect());
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -1248,7 +1319,6 @@ void Tracker::MainLoop()
 
 
     FrameData frame;
-    cv::Mat &image = frame.image;
     cv::Mat drawImg, ycc, gray, cr;
 
     cv::Mat  prevImg;
@@ -1374,16 +1444,16 @@ void Tracker::MainLoop()
         CopyFreshCameraImageTo(frame);
 
         // Figure out what would the column and row sizes would be after rotation
-        int rotated_cols = image.cols;
-        int rotated_rows = image.rows;
+        int rotated_cols = frame.cols();
+        int rotated_rows = frame.rows();
         switch (rotateFlag) {
         case cv::ROTATE_180:
             // Do nothing
             break;
         case cv::ROTATE_90_CLOCKWISE:
         case cv::ROTATE_90_COUNTERCLOCKWISE:
-            rotated_cols = image.rows;
-            rotated_rows = image.cols;
+            rotated_cols = frame.rows();
+            rotated_rows = frame.cols();
             break;
         }
 
@@ -1443,7 +1513,10 @@ void Tracker::MainLoop()
         frame.getPoseTime = clock();
 
         // Convert camera frame to grayscale
-        april.convertToSingleChannel(image, gray);
+        // frame.getImage(gray,
+        //                true,
+        //                false, 1, 1,
+        //                false, cv::Rect());
 
         frame.toGrayTime = clock();
 
@@ -1576,10 +1649,10 @@ void Tracker::MainLoop()
             int searchTop    = static_cast<int>(trackerStatus[i].oldCenter.y - 3*trackerStatus[i].searchSize);
             int searchBottom = static_cast<int>(trackerStatus[i].oldCenter.y + 3*trackerStatus[i].searchSize);
 
-            searchLeft   = (searchLeft   >= gray.cols) ? (gray.cols - 1) : ((searchLeft   < 0) ? 0 : searchLeft);
-            searchRight  = (searchRight  >= gray.cols) ? (gray.cols - 1) : ((searchRight  < 0) ? 0 : searchRight);
-            searchTop    = (searchTop    >= gray.rows) ? (gray.rows - 1) : ((searchTop    < 0) ? 0 : searchTop);
-            searchBottom = (searchBottom >= gray.rows) ? (gray.rows - 1) : ((searchBottom < 0) ? 0 : searchBottom);
+            searchLeft   = (searchLeft   >= frame.cols()) ? (frame.cols() - 1) : ((searchLeft   < 0) ? 0 : searchLeft);
+            searchRight  = (searchRight  >= frame.cols()) ? (frame.cols() - 1) : ((searchRight  < 0) ? 0 : searchRight);
+            searchTop    = (searchTop    >= frame.rows()) ? (frame.rows() - 1) : ((searchTop    < 0) ? 0 : searchTop);
+            searchBottom = (searchBottom >= frame.rows()) ? (frame.rows() - 1) : ((searchBottom < 0) ? 0 : searchBottom);
 
             const int x = searchLeft, y = searchTop;
             const int w = searchRight - searchLeft, h = searchBottom - searchTop;
@@ -1588,7 +1661,10 @@ void Tracker::MainLoop()
                 continue;
 
             cv::Mat searchGray;
-            cv::resize(cv::Mat(gray, cv::Rect(x, y, w, h)), searchGray, cv::Size(), 1.0/8.0, 1.0/8.0, cv::INTER_NEAREST);
+            frame.getImage(searchGray,
+                           true,
+                           true, 1, 8,
+                           true, cv::Rect(x, y, w, h));
 
             cv::matchTemplate(searchGray, trackerStatus[i].snapshot, matchTemplateResult, cv::TM_CCOEFF);
             didMatchTemplate = true;
@@ -1985,29 +2061,29 @@ void Tracker::MainLoop()
 
                         switch (rotateFlag) {
                         case cv::ROTATE_180:
-                            left = gray.cols - right;
-                            top = gray.rows - bottom;
-                            right = gray.cols - left_tmp;
-                            bottom = gray.rows - top_tmp;
+                            left = frame.cols() - right;
+                            top = frame.rows() - bottom;
+                            right = frame.cols() - left_tmp;
+                            bottom = frame.rows() - top_tmp;
                             break;
                         case cv::ROTATE_90_CLOCKWISE:
                             left = top;
-                            top = gray.rows - right;
+                            top = frame.rows() - right;
                             right = bottom;
-                            bottom = gray.rows - left_tmp;
+                            bottom = frame.rows() - left_tmp;
                             break;
                         case cv::ROTATE_90_COUNTERCLOCKWISE:
-                            left = gray.cols - bottom;
+                            left = frame.cols() - bottom;
                             bottom = right;
-                            right = gray.cols - top;
+                            right = frame.cols() - top;
                             top = left_tmp;
                             break;
                         }
 
-                        left   = (left   >= gray.cols) ? (gray.cols - 1) : ((left   < 0) ? 0 : left);
-                        right  = (right  >= gray.cols) ? (gray.cols - 1) : ((right  < 0) ? 0 : right);
-                        top    = (top    >= gray.rows) ? (gray.rows - 1) : ((top    < 0) ? 0 : top);
-                        bottom = (bottom >= gray.rows) ? (gray.rows - 1) : ((bottom < 0) ? 0 : bottom);
+                        left   = (left   >= frame.cols()) ? (frame.cols() - 1) : ((left   < 0) ? 0 : left);
+                        right  = (right  >= frame.cols()) ? (frame.cols() - 1) : ((right  < 0) ? 0 : right);
+                        top    = (top    >= frame.rows()) ? (frame.rows() - 1) : ((top    < 0) ? 0 : top);
+                        bottom = (bottom >= frame.rows()) ? (frame.rows() - 1) : ((bottom < 0) ? 0 : bottom);
 
                         cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
 
@@ -2019,7 +2095,12 @@ void Tracker::MainLoop()
 
                         if ((w >= 8) && (h >= 8))
                         {
-                            april.detectMarkers(cv::Mat(gray, roi), &temp_corners, &temp_ids, &temp_centers, trackers);
+                            cv::Mat detectGray;
+                            frame.getImage(detectGray,
+                                           true,
+                                           false, 1, 1,
+                                           true, roi);
+                            april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
                             drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
 
                             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
@@ -2055,10 +2136,10 @@ void Tracker::MainLoop()
         if (!(doMasking && circularWindow))
         {
             static int quadrant = 0;
-            int left = (quadrant % 4) * gray.cols/4;
-            int top = ((quadrant / 4) % 4) * gray.rows/4;
-            int right = ((quadrant % 4) + 1) * gray.cols/4 - 1;
-            int bottom = (((quadrant / 4) % 4) + 1) * gray.rows/4 - 1;
+            int left = (quadrant % 4) * frame.cols()/4;
+            int top = ((quadrant / 4) % 4) * frame.rows()/4;
+            int right = ((quadrant % 4) + 1) * frame.cols()/4 - 1;
+            int bottom = (((quadrant / 4) % 4) + 1) * frame.rows()/4 - 1;
 
             cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
 
@@ -2066,7 +2147,12 @@ void Tracker::MainLoop()
             std::vector<std::vector<cv::Point2f> > temp_corners;
             std::vector<cv::Point2f> temp_centers;
 
-            april.detectMarkers(cv::Mat(gray, roi), &temp_corners, &temp_ids, &temp_centers, trackers);
+            cv::Mat detectGray;
+            frame.getImage(detectGray,
+                           true,
+                           false, 1, 1,
+                           true, roi);
+            april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
 
             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
             {
@@ -2130,17 +2216,20 @@ void Tracker::MainLoop()
                 auto right = *rightit;
                 auto bottom = *bottomit;
 
-                left   = (left   >= gray.cols) ? (gray.cols - 1) : ((left   < 0) ? 0 : left);
-                right  = (right  >= gray.cols) ? (gray.cols - 1) : ((right  < 0) ? 0 : right);
-                top    = (top    >= gray.rows) ? (gray.rows - 1) : ((top    < 0) ? 0 : top);
-                bottom = (bottom >= gray.rows) ? (gray.rows - 1) : ((bottom < 0) ? 0 : bottom);
+                left   = (left   >= frame.cols()) ? (frame.cols() - 1) : ((left   < 0) ? 0 : left);
+                right  = (right  >= frame.cols()) ? (frame.cols() - 1) : ((right  < 0) ? 0 : right);
+                top    = (top    >= frame.rows()) ? (frame.rows() - 1) : ((top    < 0) ? 0 : top);
+                bottom = (bottom >= frame.rows()) ? (frame.rows() - 1) : ((bottom < 0) ? 0 : bottom);
 
-                const int x = static_cast<int>(left), y = static_cast<int>(top);
-                const int w = static_cast<int>(right - left), h = static_cast<int>(bottom - top);
+                const int x = static_cast<int>(left) / 8, y = static_cast<int>(top) / 8;
+                const int w = static_cast<int>(right - left) / 8, h = static_cast<int>(bottom - top) / 8;
 
                 if ((w >= 8) && (h >= 8))
                 {
-                    cv::resize(cv::Mat(gray, cv::Rect(x, y, w, h)), trackerStatus[i].snapshot, cv::Size(), 1.0/8.0, 1.0/8.0, cv::INTER_NEAREST);
+                    frame.getImage(trackerStatus[i].snapshot,
+                                   true,
+                                   true, 1, 8,
+                                   true, cv::Rect(x, y, w, h));
                     trackerStatus[i].doImageMatching = true;
                     trackerStatus[i].oldCenter = cv::Point2f((left + right)/2, (top + bottom)/2);
                 }
@@ -2565,15 +2654,15 @@ void Tracker::MainLoop()
                 auto tmp = corners[i][j].x;
                 switch (rotateFlag) {
                 case cv::ROTATE_180:
-                    corners[i][j].x = image.cols - corners[i][j].x;
-                    corners[i][j].y = image.rows - corners[i][j].y;
+                    corners[i][j].x = frame.cols() - corners[i][j].x;
+                    corners[i][j].y = frame.rows() - corners[i][j].y;
                     break;
                 case cv::ROTATE_90_CLOCKWISE:
                     corners[i][j].x = corners[i][j].y;
-                    corners[i][j].y = image.rows - tmp;
+                    corners[i][j].y = frame.rows() - tmp;
                     break;
                 case cv::ROTATE_90_COUNTERCLOCKWISE:
-                    corners[i][j].x = image.cols - corners[i][j].y;
+                    corners[i][j].x = frame.cols() - corners[i][j].y;
                     corners[i][j].y = tmp;
                     break;
                 }
@@ -2582,12 +2671,26 @@ void Tracker::MainLoop()
 
         if (!disableOut)
         {
-            drawImg = image;
+            int scale_denom = 1;
+            while (true) {
+                if (((frame.rows() / scale_denom) > drawImgSize) ||
+                    ((frame.cols() / scale_denom) > drawImgSize)) {
+                    scale_denom++;
+                } else {
+                    if (scale_denom > 1)
+                        scale_denom--;
+                    break;
+                }
+            }
+            frame.getImage(drawImg,
+                           false,
+                           false, 1, scale_denom,
+                           false, cv::Rect());
             cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
 
             if (privacyMode)
             {
-                cv::Mat mask = cv::Mat::zeros(image.size(), image.type());
+                cv::Mat mask = cv::Mat::zeros(drawImgMasked.size(), drawImgMasked.type());
 
                 for (int i = 0; i < corners.size(); i++)
                 {
@@ -2657,15 +2760,15 @@ void Tracker::MainLoop()
             }
 
             int cols, rows;
-            if (image.cols < image.rows)
+            if (frame.cols() < frame.rows())
             {
-                cols = image.cols * drawImgSize / image.rows;
+                cols = frame.cols() * drawImgSize / frame.rows();
                 rows = drawImgSize;
             }
             else
             {
                 cols = drawImgSize;
-                rows = image.rows * drawImgSize / image.cols;
+                rows = frame.rows() * drawImgSize / frame.cols();
             }
             cv::Mat *outImg = new cv::Mat();
             cv::resize(drawImg, *outImg, cv::Size(cols, rows));
