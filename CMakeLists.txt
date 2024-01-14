@@ -16,9 +16,11 @@ SET (wxBUILD_SHARED "0" CACHE BOOL "")
 SET (OPENVR_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openvr/headers")
 find_library(OPENVR_LIB openvr_api HINTS "${CMAKE_CURRENT_SOURCE_DIR}/openvr/lib/${PLATFORM_NAME}${PROCESSOR_ARCH}/" NO_DEFAULT_PATH )
 
-include (FindPkgConfig)
-pkg_check_modules(EIGEN3 REQUIRED IMPORTED_TARGET eigen3)
+#include (FindPkgConfig)
+#pkg_check_modules(EIGEN3 REQUIRED IMPORTED_TARGET eigen3)
 
+find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # Include sub-projects.
 add_subdirectory("wxWidgets" EXCLUDE_FROM_ALL)
@@ -28,6 +30,7 @@ add_dependencies("AprilTagTrackers" "apriltags")
 add_dependencies("AprilTagTrackers" "wxbase" "wxcore" "wxnet")
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT AprilTagTrackers)
 #set_target_properties("AprilTagTrackers" PROPERTIES LINK_FLAGS /SUBSYSTEM:WINDOWS )
+
 add_subdirectory("MulticamCalibrator")
 add_dependencies("MulticamCalibrator" "apriltags")
 add_dependencies("MulticamCalibrator" "wxbase" "wxcore" "wxnet")
