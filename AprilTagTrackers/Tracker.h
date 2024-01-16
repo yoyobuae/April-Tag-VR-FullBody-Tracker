@@ -6,6 +6,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <memory>
 #include <math.h>
 
 #include <opencv2/aruco.hpp>
@@ -97,10 +98,8 @@ struct TrackerStatus {
     TrackerPose pose_delta_average;
 };
 
-
 class FrameData
 {
-    cv::Mat image;
 public:
     bool ready = false;
     clock_t captureTime;
@@ -113,16 +112,73 @@ public:
     clock_t detectTime;
     clock_t sendTrackerTime;
 
-    void swap(cv::Mat &other);
-    void swap(FrameData &other);
-    void getImage(cv::Mat &out,
-                  bool grayscale,
-                  bool scale, int scale_num, int scale_denom,
-                  bool useRoi, const cv::Rect &roi);
-    cv::Size size() const;
+    virtual ~FrameData() { }
+
+    virtual void swap(FrameData& other) = 0;
+    virtual void getImage(cv::Mat& out,
+                          bool grayscale,
+                          bool scale, int scale_num, int scale_denom,
+                          bool useRoi, const cv::Rect& roi) = 0;
+    virtual cv::Size size() const = 0;
+    virtual int rows() const = 0;
+    virtual int cols() const = 0;
+};
+
+class FrameDataOCV : public FrameData
+{
+    cv::Mat image;
+public:
+    virtual ~FrameDataOCV() { }
+
+    void swap(cv::Mat& other);
     int flags() const;
-    int rows() const;
-    int cols() const;
+
+    virtual void swap(FrameData& other) override;
+    virtual void getImage(cv::Mat &out,
+                          bool grayscale,
+                          bool scale, int scale_num, int scale_denom,
+                          bool useRoi, const cv::Rect& roi) override;
+    virtual cv::Size size() const override;
+    virtual int rows() const override;
+    virtual int cols() const override;
+};
+
+class Camera {
+public:
+    virtual ~Camera() { }
+
+    virtual void StartStop(std::string id, int apiPreference) = 0;
+    virtual bool isRunning() = 0;
+    virtual FrameData* MakeFrame() = 0;
+    virtual void CopyFreshImageTo(FrameData& frame) = 0;
+};
+
+class Tracker;
+
+class CameraOCV : public Camera {
+
+    GUI *gui;
+    Tracker* tracker;
+    Parameters *parameters;
+    std::string id;
+    int apiPreference;
+    cv::VideoCapture cap;
+    bool cameraRunning;
+    std::thread cameraThread;
+    std::mutex cameraFrameMutex;
+    std::condition_variable cameraFrameCondVar;
+    std::unique_ptr<FrameDataOCV> cameraFrame;
+
+    void CameraLoop();
+
+public:
+    CameraOCV(Tracker* tracker, GUI* gui, Parameters* parameters);
+    virtual ~CameraOCV() { }
+
+    virtual void StartStop(std::string id, int apiPreference) override;
+    virtual bool isRunning() override;
+    virtual FrameData* MakeFrame() override;
+    virtual void CopyFreshImageTo(FrameData& frame) override;
 };
 
 
@@ -138,9 +194,10 @@ public:
     void StartCameraCalib();
     void StartTrackerCalib();
     void Start();
+    void SetGUI(GUI *gui);
+    void StopCamera();
 
     bool mainThreadRunning = false;
-    bool cameraRunning = false;
     bool previewCamera = false;
     bool previewCameraCalibration = false;
     bool showTimeProfile = false;
@@ -154,35 +211,27 @@ public:
     bool showTimingStats = true;
     int messageDialogResponse = wxID_CANCEL;
 
-    GUI* gui;
-
     cv::Mat wtranslation = (cv::Mat_<double>(4, 4) << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
     Quaternion<double> wrotation = Quaternion<double>(1, 0, 0, 0);
 
     double calibScale = 1;
+    int drawImgSize = 1385;
+    bool rotate = false;
+    int rotateFlag = -1;
 
 private:
-    void CameraLoop();
-    void CopyFreshCameraImageTo(FrameData& frame);
     void CalibrateCamera();
     void CalibrateCameraCharuco();
     void CalibrateTracker();
     void MainLoop();
 
-    int drawImgSize = 1385;
 
-    cv::VideoCapture cap;
-
-    // cameraFrame is protected by cameraImageMutex.
-    // Use CopyFreshCameraFrameTo in order to get the latest camera frame.
-    std::mutex cameraFrameMutex;
-    std::condition_variable cameraFrameCondVar;
-    FrameData cameraFrame;
-
+    GUI* gui;
     Parameters* parameters;
     Connection* connection;
 
-    std::thread cameraThread;
+    Camera *camera;
+
     std::thread mainThread;
 
     std::vector<cv::Ptr<cv::aruco::Board>> trackers;
@@ -190,9 +239,6 @@ private:
 
     cv::Mat statsImg = cv::Mat(1000, 2000, CV_8UC3, cv::Scalar(0, 0, 0));
     int statsCurX = 0;
-
-    bool rotate = false;
-    int rotateFlag = -1;
 
     //Quaternion
 

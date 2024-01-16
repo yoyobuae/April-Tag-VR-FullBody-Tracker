@@ -3,6 +3,7 @@
 #include <random>
 #include <sstream>
 #include <vector>
+#include <typeinfo>
 
 #pragma warning(push)
 #pragma warning(disable:4996)
@@ -162,17 +163,27 @@ void previewCalibration(cv::Mat& drawImg, Parameters* parameters)
 
 } // namespace
 
-void FrameData::swap(cv::Mat &other)
+void FrameDataOCV::swap(cv::Mat& other)
 {
     cv::swap(image, other);
 }
 
-void FrameData::swap(FrameData &other)
+void FrameDataOCV::swap(FrameData& other)
 {
-    cv::swap(image, other.image);
+    try {
+        auto otherOCV = dynamic_cast<FrameDataOCV&>(other);
+        cv::swap(image, otherOCV.image);
+    }
+    catch (const std::bad_cast& e)
+    {
+        std::cout << "Caught exception: " << e.what() << std::endl;
+    }
 }
 
-void FrameData::getImage(cv::Mat &out, bool grayscale, bool scale, int scale_num, int scale_denom, bool useRoi, const cv::Rect &roi)
+void FrameDataOCV::getImage(cv::Mat& out,
+                            bool grayscale,
+                            bool scale, int scale_num, int scale_denom,
+                            bool useRoi, const cv::Rect& roi)
 {
     cv::Mat src;
 
@@ -200,24 +211,41 @@ void FrameData::getImage(cv::Mat &out, bool grayscale, bool scale, int scale_num
     }
 }
 
-cv::Size FrameData::size() const
+cv::Size FrameDataOCV::size() const
 {
     return image.size();
 }
 
-int FrameData::flags() const
+int FrameDataOCV::flags() const
 {
     return image.flags;
 }
 
-int FrameData::rows() const
+int FrameDataOCV::rows() const
 {
     return image.rows;
 }
 
-int FrameData::cols() const
+int FrameDataOCV::cols() const
 {
     return image.cols;
+}
+
+CameraOCV::CameraOCV(Tracker* tracker, GUI* gui, Parameters* parameters)
+    : tracker(tracker)
+    , gui(gui)
+    , parameters(parameters)
+{
+}
+
+bool CameraOCV::isRunning()
+{
+    return cameraRunning;
+}
+
+FrameData* CameraOCV::MakeFrame()
+{
+    return new FrameDataOCV();
 }
 
 Tracker::Tracker(Parameters* params, Connection* conn, MyApp* app)
@@ -238,12 +266,34 @@ Tracker::Tracker(Parameters* params, Connection* conn, MyApp* app)
     calibScale = parameters->calibScale;
 }
 
+void Tracker::SetGUI(GUI *gui)
+{
+    this->gui = gui;
+    camera = new CameraOCV(this, gui, this->parameters);
+}
+
 void Tracker::StartCamera(std::string id, int apiPreference)
+{
+    if (camera->isRunning())
+    {
+        mainThreadRunning = false;
+    }
+    camera->StartStop(id, apiPreference);
+}
+
+void Tracker::StopCamera()
+{
+    if (camera->isRunning())
+    {
+        camera->StartStop("0", 0);
+    }
+}
+
+void CameraOCV::StartStop(std::string id, int apiPreference)
 {
     if (cameraRunning)
     {
         cameraRunning = false;
-        mainThreadRunning = false;
         //cameraThread.join();
         sleep_millis(1000);
         return;
@@ -319,27 +369,27 @@ void Tracker::StartCamera(std::string id, int apiPreference)
 
 
     cameraRunning = true;
-    cameraThread = std::thread(&Tracker::CameraLoop, this);
+    cameraThread = std::thread(&CameraOCV::CameraLoop, this);
     cameraThread.detach();
 }
 
-void Tracker::CameraLoop()
+void CameraOCV::CameraLoop()
 {
     bool previewShown = false;
     if (parameters->rotateCl && parameters->rotateCounterCl)
     {
-        rotate = true;
-        rotateFlag = cv::ROTATE_180;
+        tracker->rotate = true;
+        tracker->rotateFlag = cv::ROTATE_180;
     }
     else if (parameters->rotateCl)
     {
-        rotate = true;
-        rotateFlag = cv::ROTATE_90_CLOCKWISE;
+        tracker->rotate = true;
+        tracker->rotateFlag = cv::ROTATE_90_CLOCKWISE;
     }
     else if (parameters->rotateCounterCl)
     {
-        rotate = true;
-        rotateFlag = cv::ROTATE_90_COUNTERCLOCKWISE;
+        tracker->rotate = true;
+        tracker->rotateFlag = cv::ROTATE_90_COUNTERCLOCKWISE;
     }
     cv::Mat img;
     cv::Mat drawImg;
@@ -347,6 +397,8 @@ void Tracker::CameraLoop()
     clock_t last_frame_time = clock();
     bool frame_visible = false;
     int cols, rows;
+
+    cameraFrame.reset(new FrameDataOCV());
 
     while (cameraRunning)
     {
@@ -365,24 +417,24 @@ void Tracker::CameraLoop()
         fps = 0.95*fps + 0.05/(double(curtime - last_frame_time) / double(CLOCKS_PER_SEC));
         last_frame_time = curtime;        
         std::string resolution = std::to_string(img.cols) + "x" + std::to_string(img.rows);
-        if (previewCamera || previewCameraCalibration)
+        if (tracker->previewCamera || tracker->previewCameraCalibration)
         {
             if (img.cols < img.rows)
             {
-                cols = img.cols * drawImgSize / img.rows;
-                rows = drawImgSize;
+                cols = img.cols * tracker->drawImgSize / img.rows;
+                rows = tracker->drawImgSize;
             }
             else
             {
-                cols = drawImgSize;
-                rows = img.rows * drawImgSize / img.cols;
+                cols = tracker->drawImgSize;
+                rows = img.rows * tracker->drawImgSize / img.cols;
             }
             img.copyTo(drawImg);
             cv::putText(drawImg, std::to_string((int)(fps + (0.5))), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
             cv::putText(drawImg, resolution, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
             cv::line(drawImg, cv::Point(img.cols/2, 0), cv::Point(img.cols/2, img.rows), cv::Scalar(0, 0, 255));
             cv::line(drawImg, cv::Point(0, img.rows/2), cv::Point(img.cols, img.rows/2), cv::Scalar(0, 0, 255));
-            if (previewCameraCalibration)
+            if (tracker->previewCameraCalibration)
             {
                 cv::Mat *outImg = new cv::Mat();
                 previewCalibration(drawImg, parameters);
@@ -422,64 +474,46 @@ void Tracker::CameraLoop()
             // Swap avoids copying the pixel buffer. It only swaps pointers and metadata.
             // The pixel buffer from cameraImage can be reused if the size and format matches.
 
-            cameraFrame.swap(img);
-            if (img.size() != cameraFrame.size() || img.flags != cameraFrame.flags())
+            cameraFrame->swap(img);
+            if (img.size() != cameraFrame->size() || img.flags != cameraFrame->flags())
             {
                 img.release();
             }
-            cameraFrame.ready = true;
-            cameraFrame.captureTime = last_frame_time;
-            cameraFrame.swapTime = clock();
+            cameraFrame->ready = true;
+            cameraFrame->captureTime = last_frame_time;
+            cameraFrame->swapTime = clock();
         }
         cameraFrameCondVar.notify_one();
 
-        if (!disableOpenVrApi)
-        {
-            //process events. BETA TEST ONLY, MOVE TO CONNECTION LATER
-            if (connection->status == connection->CONNECTED)
-            {
-                vr::VREvent_t event;
-                while (connection->openvr_handle->PollNextEvent(&event, sizeof(event)))
-                {
-                    if (event.eventType == vr::VREvent_Quit)
-                    {
-                        connection->openvr_handle->AcknowledgeQuit_Exiting();       //close connection to steamvr without closing att
-                        connection->status = connection->DISCONNECTED;
-                        vr::VR_Shutdown();
-                        mainThreadRunning = false;
-                        break;
-                    }
-                }
-            }
-        }
     }
     gui->CallAfter([] ()
                    {
                    cv::destroyAllWindows();
                    });
+    cameraFrame.reset();
     cap.release();
 }
 
-void Tracker::CopyFreshCameraImageTo(FrameData& frame)
+void CameraOCV::CopyFreshImageTo(FrameData& frame)
 {
     {
         std::unique_lock<std::mutex> lock(cameraFrameMutex);
-        if (!cameraFrame.ready)
+        if (!(cameraFrame && cameraFrame->ready))
         {
-            cameraFrameCondVar.wait(lock, [&]{ return cameraFrame.ready; });
+            cameraFrameCondVar.wait(lock, [&]{ return cameraFrame && cameraFrame->ready; });
         }
         {
-            cameraFrame.ready = false;
+            cameraFrame->ready = false;
             frame.ready = true;
             // Swap metadata and pointers to pixel buffers.
-            frame.swap(cameraFrame);
+            frame.swap(*cameraFrame);
             // We don't want to overwrite shared data so release the image unless we are the only user of it.
             // if (!(cameraFrame.image.u && cameraFrame.image.u->refcount == 1))
             // {
             //     cameraFrame.image.release();
             // }
-            frame.captureTime = cameraFrame.captureTime;
-            frame.swapTime = cameraFrame.swapTime;
+            frame.captureTime = cameraFrame->captureTime;
+            frame.swapTime = cameraFrame->swapTime;
             frame.copyFreshTime = clock();
             return;
         }
@@ -507,7 +541,7 @@ void Tracker::StartCameraCalib()
         mainThreadRunning = false;
         return;
     }
-    if (!cameraRunning)
+    if (!camera->isRunning())
     {
         bool *mtr = &mainThreadRunning;
         wxString e = parameters->language.TRACKER_CAMERA_NOTRUNNING;
@@ -536,7 +570,7 @@ void Tracker::CalibrateCameraCharuco()
 {
     //function to calibrate our camera
 
-    FrameData frame;
+    auto frame = std::unique_ptr<FrameData>(camera->MakeFrame());
     cv::Mat image;
     cv::Mat gray;
     cv::Mat drawImg;
@@ -581,13 +615,13 @@ void Tracker::CalibrateCameraCharuco()
     std::vector<std::vector<int>> allCharucoIds;
 
     int picsTaken = 0;
-    while(mainThreadRunning && cameraRunning)
+    while(mainThreadRunning && camera->isRunning())
     {
-        CopyFreshCameraImageTo(frame);
-        frame.getImage(image,
-                       false,
-                       false, 1, 1,
-                       false, cv::Rect());
+        camera->CopyFreshImageTo(*frame);
+        frame->getImage(image,
+                        false,
+                        false, 1, 1,
+                        false, cv::Rect());
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -832,7 +866,7 @@ void Tracker::CalibrateCamera()
     std::vector<cv::Point2f> corner_pts;
     bool success;
 
-    FrameData frame;
+    auto frame = std::unique_ptr<FrameData>(camera->MakeFrame());
     cv::Mat image;
 
     int i = 0;
@@ -842,7 +876,7 @@ void Tracker::CalibrateCamera()
 
     while (i < picNum)
     {
-        if (!mainThreadRunning || !cameraRunning)
+        if (!mainThreadRunning || !camera->isRunning())
         {
             gui->CallAfter([] ()
                            {
@@ -850,11 +884,11 @@ void Tracker::CalibrateCamera()
                            });
             return;
         }
-        CopyFreshCameraImageTo(frame);
-        frame.getImage(image,
-                       false,
-                       false, 1, 1,
-                       false, cv::Rect());
+        camera->CopyFreshImageTo(*frame);
+        frame->getImage(image,
+                        false,
+                        false, 1, 1,
+                        false, cv::Rect());
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -940,7 +974,7 @@ void Tracker::StartTrackerCalib()
         mainThreadRunning = false;
         return;
     }
-    if (!cameraRunning)
+    if (!camera->isRunning())
     {
         wxString e = parameters->language.TRACKER_CAMERA_NOTRUNNING;
         bool *mtr = &mainThreadRunning;
@@ -992,7 +1026,7 @@ void Tracker::Start()
         mainThreadRunning = false;
         return;
     }
-    if (!cameraRunning)
+    if (!camera->isRunning())
     {
         wxMessageDialog dial(NULL,
             parameters->language.TRACKER_CAMERA_NOTRUNNING, wxT("Error"), wxOK | wxICON_ERROR);
@@ -1062,7 +1096,7 @@ void Tracker::CalibrateTracker()
         boardRvec.push_back(cv::Vec3d());
         boardTvec.push_back(cv::Vec3d());
     }
-    FrameData frame;
+    auto frame = std::unique_ptr<FrameData>(camera->MakeFrame());
     cv::Mat image;
     cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
 
@@ -1072,13 +1106,13 @@ void Tracker::CalibrateTracker()
 
     trackers.clear();
 
-    while (cameraRunning && mainThreadRunning)
+    while (camera->isRunning() && mainThreadRunning)
     {
-        CopyFreshCameraImageTo(frame);
-        frame.getImage(image,
-                       false,
-                       false, 1, 1,
-                       false, cv::Rect());
+        camera->CopyFreshImageTo(*frame);
+        frame->getImage(image,
+                        false,
+                        false, 1, 1,
+                        false, cv::Rect());
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -1318,7 +1352,7 @@ void Tracker::MainLoop()
     std::vector<cv::Point2f> centers;
 
 
-    FrameData frame;
+    auto frame = std::unique_ptr<FrameData>(camera->MakeFrame());
     cv::Mat drawImg, ycc, gray, cr;
     cv::Mat searchGray;
     cv::Mat prevSearchGray;
@@ -1438,22 +1472,22 @@ void Tracker::MainLoop()
                    });
     std::vector<std::function<void(cv::Mat &)>> drawUiFuncs;
 
-    while (mainThreadRunning && cameraRunning)
+    while (mainThreadRunning && camera->isRunning())
     {
         // Wait until frame from camera is available and then fetch it
-        CopyFreshCameraImageTo(frame);
+        camera->CopyFreshImageTo(*frame);
 
         // Figure out what would the column and row sizes would be after rotation
-        int rotated_cols = frame.cols();
-        int rotated_rows = frame.rows();
+        int rotated_cols = frame->cols();
+        int rotated_rows = frame->rows();
         switch (rotateFlag) {
         case cv::ROTATE_180:
             // Do nothing
             break;
         case cv::ROTATE_90_CLOCKWISE:
         case cv::ROTATE_90_COUNTERCLOCKWISE:
-            rotated_cols = frame.rows();
-            rotated_rows = frame.cols();
+            rotated_cols = frame->rows();
+            rotated_rows = frame->cols();
             break;
         }
 
@@ -1465,7 +1499,7 @@ void Tracker::MainLoop()
 
         // Fetch the predicted pose from driver side
         {
-            double frameTime = double(clock() - frame.captureTime) / double(CLOCKS_PER_SEC);
+            double frameTime = double(clock() - frame->captureTime) / double(CLOCKS_PER_SEC);
 
             std::stringstream ss;
 
@@ -1510,20 +1544,20 @@ void Tracker::MainLoop()
             }
         }
 
-        frame.getPoseTime = clock();
+        frame->getPoseTime = clock();
 
         // Convert camera frame to grayscale
-        // frame.getImage(gray,
-        //                true,
-        //                false, 1, 1,
-        //                false, cv::Rect());
-        frame.getImage(searchGray,
-                       true,
-                       true, 1, 8,
-                       false, cv::Rect());
+        // frame->getImage(gray,
+        //                 true,
+        //                 false, 1, 1,
+        //                 false, cv::Rect());
+        frame->getImage(searchGray,
+                        true,
+                        true, 1, 8,
+                        false, cv::Rect());
 
 
-        frame.toGrayTime = clock();
+        frame->toGrayTime = clock();
 
         clock_t start, end;
         //for timing our detection
@@ -1639,7 +1673,7 @@ void Tracker::MainLoop()
 
         }
 
-        frame.processPoseTime = clock();
+        frame->processPoseTime = clock();
 
         didMatchTemplate = false;
 
@@ -1654,10 +1688,10 @@ void Tracker::MainLoop()
             int searchTop    = static_cast<int>(trackerStatus[i].oldCenter.y - 3*trackerStatus[i].searchSize);
             int searchBottom = static_cast<int>(trackerStatus[i].oldCenter.y + 3*trackerStatus[i].searchSize);
 
-            searchLeft   = (searchLeft   >= frame.cols()) ? (frame.cols() - 1) : ((searchLeft   < 0) ? 0 : searchLeft);
-            searchRight  = (searchRight  >= frame.cols()) ? (frame.cols() - 1) : ((searchRight  < 0) ? 0 : searchRight);
-            searchTop    = (searchTop    >= frame.rows()) ? (frame.rows() - 1) : ((searchTop    < 0) ? 0 : searchTop);
-            searchBottom = (searchBottom >= frame.rows()) ? (frame.rows() - 1) : ((searchBottom < 0) ? 0 : searchBottom);
+            searchLeft   = (searchLeft   >= frame->cols()) ? (frame->cols() - 1) : ((searchLeft   < 0) ? 0 : searchLeft);
+            searchRight  = (searchRight  >= frame->cols()) ? (frame->cols() - 1) : ((searchRight  < 0) ? 0 : searchRight);
+            searchTop    = (searchTop    >= frame->rows()) ? (frame->rows() - 1) : ((searchTop    < 0) ? 0 : searchTop);
+            searchBottom = (searchBottom >= frame->rows()) ? (frame->rows() - 1) : ((searchBottom < 0) ? 0 : searchBottom);
 
             const int x = searchLeft / 8, y = searchTop / 8;
             const int w = (searchRight - searchLeft) / 8, h = (searchBottom - searchTop) / 8;
@@ -1877,7 +1911,7 @@ void Tracker::MainLoop()
         }
 #endif
 
-        frame.doMaskTime = clock();
+        frame->doMaskTime = clock();
 
         //cv::imshow("test", image);
 
@@ -2062,29 +2096,29 @@ void Tracker::MainLoop()
 
                         switch (rotateFlag) {
                         case cv::ROTATE_180:
-                            left = frame.cols() - right;
-                            top = frame.rows() - bottom;
-                            right = frame.cols() - left_tmp;
-                            bottom = frame.rows() - top_tmp;
+                            left = frame->cols() - right;
+                            top = frame->rows() - bottom;
+                            right = frame->cols() - left_tmp;
+                            bottom = frame->rows() - top_tmp;
                             break;
                         case cv::ROTATE_90_CLOCKWISE:
                             left = top;
-                            top = frame.rows() - right;
+                            top = frame->rows() - right;
                             right = bottom;
-                            bottom = frame.rows() - left_tmp;
+                            bottom = frame->rows() - left_tmp;
                             break;
                         case cv::ROTATE_90_COUNTERCLOCKWISE:
-                            left = frame.cols() - bottom;
+                            left = frame->cols() - bottom;
                             bottom = right;
-                            right = frame.cols() - top;
+                            right = frame->cols() - top;
                             top = left_tmp;
                             break;
                         }
 
-                        left   = (left   >= frame.cols()) ? (frame.cols() - 1) : ((left   < 0) ? 0 : left);
-                        right  = (right  >= frame.cols()) ? (frame.cols() - 1) : ((right  < 0) ? 0 : right);
-                        top    = (top    >= frame.rows()) ? (frame.rows() - 1) : ((top    < 0) ? 0 : top);
-                        bottom = (bottom >= frame.rows()) ? (frame.rows() - 1) : ((bottom < 0) ? 0 : bottom);
+                        left   = (left   >= frame->cols()) ? (frame->cols() - 1) : ((left   < 0) ? 0 : left);
+                        right  = (right  >= frame->cols()) ? (frame->cols() - 1) : ((right  < 0) ? 0 : right);
+                        top    = (top    >= frame->rows()) ? (frame->rows() - 1) : ((top    < 0) ? 0 : top);
+                        bottom = (bottom >= frame->rows()) ? (frame->rows() - 1) : ((bottom < 0) ? 0 : bottom);
 
                         cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
 
@@ -2097,10 +2131,10 @@ void Tracker::MainLoop()
                         if ((w >= 8) && (h >= 8))
                         {
                             cv::Mat detectGray;
-                            frame.getImage(detectGray,
-                                           true,
-                                           false, 1, 1,
-                                           true, roi);
+                            frame->getImage(detectGray,
+                                            true,
+                                            false, 1, 1,
+                                            true, roi);
                             april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
                             drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
 
@@ -2137,10 +2171,10 @@ void Tracker::MainLoop()
         if (!(doMasking && circularWindow))
         {
             static int quadrant = 0;
-            int left = (quadrant % 4) * frame.cols()/4;
-            int top = ((quadrant / 4) % 4) * frame.rows()/4;
-            int right = ((quadrant % 4) + 1) * frame.cols()/4 - 1;
-            int bottom = (((quadrant / 4) % 4) + 1) * frame.rows()/4 - 1;
+            int left = (quadrant % 4) * frame->cols()/4;
+            int top = ((quadrant / 4) % 4) * frame->rows()/4;
+            int right = ((quadrant % 4) + 1) * frame->cols()/4 - 1;
+            int bottom = (((quadrant / 4) % 4) + 1) * frame->rows()/4 - 1;
 
             cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
 
@@ -2149,10 +2183,10 @@ void Tracker::MainLoop()
             std::vector<cv::Point2f> temp_centers;
 
             cv::Mat detectGray;
-            frame.getImage(detectGray,
-                           true,
-                           false, 1, 1,
-                           true, roi);
+            frame->getImage(detectGray,
+                            true,
+                            false, 1, 1,
+                            true, roi);
             april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
 
             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
@@ -2183,7 +2217,7 @@ void Tracker::MainLoop()
             quadrant = (quadrant + 1) % 16;
         }
 
-        frame.detectTime = clock();
+        frame->detectTime = clock();
 
         // Store a snapshot image of each tracker
         for (int i = 0; i < trackerNum; ++i)
@@ -2217,19 +2251,19 @@ void Tracker::MainLoop()
                 auto right = *rightit;
                 auto bottom = *bottomit;
 
-                left   = (left   >= frame.cols()) ? (frame.cols() - 1) : ((left   < 0) ? 0 : left);
-                right  = (right  >= frame.cols()) ? (frame.cols() - 1) : ((right  < 0) ? 0 : right);
-                top    = (top    >= frame.rows()) ? (frame.rows() - 1) : ((top    < 0) ? 0 : top);
-                bottom = (bottom >= frame.rows()) ? (frame.rows() - 1) : ((bottom < 0) ? 0 : bottom);
+                left   = (left   >= frame->cols()) ? (frame->cols() - 1) : ((left   < 0) ? 0 : left);
+                right  = (right  >= frame->cols()) ? (frame->cols() - 1) : ((right  < 0) ? 0 : right);
+                top    = (top    >= frame->rows()) ? (frame->rows() - 1) : ((top    < 0) ? 0 : top);
+                bottom = (bottom >= frame->rows()) ? (frame->rows() - 1) : ((bottom < 0) ? 0 : bottom);
 
-                const int x = static_cast<int>(left) / 8, y = static_cast<int>(top) / 8;
-                const int w = static_cast<int>(right - left) / 8, h = static_cast<int>(bottom - top) / 8;
+                const int x = static_cast<int>(left), y = static_cast<int>(top);
+                const int w = static_cast<int>(right - left), h = static_cast<int>(bottom - top);
 
                 if ((w >= 8) && (h >= 8))
                 {
                     trackerStatus[i].doImageMatching = true;
                     trackerStatus[i].oldCenter = cv::Point2f((left + right)/2, (top + bottom)/2);
-                    trackerStatus[i].oldRoi = cv::Rect(x, y, w, h);
+                    trackerStatus[i].oldRoi = cv::Rect(x/8, y/8, w/8, h/8);
                 }
             }
         }
@@ -2462,7 +2496,7 @@ void Tracker::MainLoop()
 #endif
 
             end = clock();
-            double frameTime = double(end - frame.captureTime) / double(CLOCKS_PER_SEC);
+            double frameTime = double(end - frame->captureTime) / double(CLOCKS_PER_SEC);
 
             if (!multicamAutocalib) {
                 // Send tracker positions/rotations to driver
@@ -2647,22 +2681,22 @@ void Tracker::MainLoop()
 
         }
 
-        frame.sendTrackerTime = clock();
+        frame->sendTrackerTime = clock();
 
         for (int i = 0; i < corners.size(); i++) {
             for (int j = 0; j < corners[i].size(); j++) {
                 auto tmp = corners[i][j].x;
                 switch (rotateFlag) {
                 case cv::ROTATE_180:
-                    corners[i][j].x = frame.cols() - corners[i][j].x;
-                    corners[i][j].y = frame.rows() - corners[i][j].y;
+                    corners[i][j].x = frame->cols() - corners[i][j].x;
+                    corners[i][j].y = frame->rows() - corners[i][j].y;
                     break;
                 case cv::ROTATE_90_CLOCKWISE:
                     corners[i][j].x = corners[i][j].y;
-                    corners[i][j].y = frame.rows() - tmp;
+                    corners[i][j].y = frame->rows() - tmp;
                     break;
                 case cv::ROTATE_90_COUNTERCLOCKWISE:
-                    corners[i][j].x = frame.cols() - corners[i][j].y;
+                    corners[i][j].x = frame->cols() - corners[i][j].y;
                     corners[i][j].y = tmp;
                     break;
                 }
@@ -2673,8 +2707,8 @@ void Tracker::MainLoop()
         {
             int scale_denom = 1;
             while (true) {
-                if (((frame.rows() / scale_denom) > drawImgSize) ||
-                    ((frame.cols() / scale_denom) > drawImgSize)) {
+                if (((frame->rows() / scale_denom) > drawImgSize) ||
+                    ((frame->cols() / scale_denom) > drawImgSize)) {
                     scale_denom++;
                 } else {
                     if (scale_denom > 1)
@@ -2682,10 +2716,10 @@ void Tracker::MainLoop()
                     break;
                 }
             }
-            frame.getImage(drawImg,
-                           false,
-                           false, 1, scale_denom,
-                           false, cv::Rect());
+            frame->getImage(drawImg,
+                            false,
+                            false, 1, scale_denom,
+                            false, cv::Rect());
             cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
 
             if (privacyMode)
@@ -2722,14 +2756,14 @@ void Tracker::MainLoop()
             {
                 cv::Mat *outImg = new cv::Mat();
 
-                int frameWriteMsecs = int(20000.0 * double(frame.swapTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-                int frameReadMsecs = int(20000.0 * double(frame.copyFreshTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-                int getPoseMsecs = int(20000.0 * double(frame.getPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-                int toGrayMsecs = int(20000.0 * double(frame.toGrayTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-                int processPoseMsecs = int(20000.0 * double(frame.processPoseTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-                int doMaskMsecs = int(20000.0 * double(frame.doMaskTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-                int detectMsecs = int(20000.0 * double(frame.detectTime - frame.captureTime) / double(CLOCKS_PER_SEC));
-                int sendTrackerMsecs = int(20000.0 * double(frame.sendTrackerTime - frame.captureTime) / double(CLOCKS_PER_SEC));
+                int frameWriteMsecs = int(20000.0 * double(frame->swapTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int frameReadMsecs = int(20000.0 * double(frame->copyFreshTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int getPoseMsecs = int(20000.0 * double(frame->getPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int toGrayMsecs = int(20000.0 * double(frame->toGrayTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int processPoseMsecs = int(20000.0 * double(frame->processPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int doMaskMsecs = int(20000.0 * double(frame->doMaskTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int detectMsecs = int(20000.0 * double(frame->detectTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int sendTrackerMsecs = int(20000.0 * double(frame->sendTrackerTime - frame->captureTime) / double(CLOCKS_PER_SEC));
 
                 rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows), cv::Scalar(0, 0, 0), -1);                        // Clear
                 rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs), cv::Scalar(133, 178, 208), -1);// Light Brown
@@ -2760,15 +2794,15 @@ void Tracker::MainLoop()
             }
 
             int cols, rows;
-            if (frame.cols() < frame.rows())
+            if (frame->cols() < frame->rows())
             {
-                cols = frame.cols() * drawImgSize / frame.rows();
+                cols = frame->cols() * drawImgSize / frame->rows();
                 rows = drawImgSize;
             }
             else
             {
                 cols = drawImgSize;
-                rows = frame.rows() * drawImgSize / frame.cols();
+                rows = frame->rows() * drawImgSize / frame->cols();
             }
             cv::Mat *outImg = new cv::Mat();
             cv::resize(drawImg, *outImg, cv::Size(cols, rows));

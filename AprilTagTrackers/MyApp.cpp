@@ -9,7 +9,7 @@ wxIMPLEMENT_APP(MyApp);
 
 int MyApp::OnExit()
 {
-    tracker->cameraRunning = false;
+    tracker->StopCamera();
     tracker->mainThreadRunning = false;
     sleep_millis(2000);
     return 0;
@@ -28,7 +28,7 @@ bool MyApp::OnInit()
     gui->posHbox->Show(false);
     gui->rotHbox->Show(false);
 
-    tracker->gui = gui;
+    tracker->SetGUI(gui);
 
     Connect(GUI::CAMERA_BUTTON, wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(MyApp::ButtonPressedCamera));
     Connect(GUI::CAMERA_CHECKBOX, wxEVT_COMMAND_CHECKBOX_CLICKED, wxCommandEventHandler(MyApp::ButtonPressedCameraPreview));
