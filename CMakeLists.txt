@@ -19,6 +19,7 @@ find_library(OPENVR_LIB openvr_api HINTS "${CMAKE_CURRENT_SOURCE_DIR}/openvr/lib
 #include (FindPkgConfig)
 #pkg_check_modules(EIGEN3 REQUIRED IMPORTED_TARGET eigen3)
 
+find_package(libjpeg-turbo REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
 
