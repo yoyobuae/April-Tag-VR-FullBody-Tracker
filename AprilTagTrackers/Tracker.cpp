@@ -19,6 +19,8 @@
 #include <opencv2/aruco/charuco.hpp>
 #include <thread>
 
+#include "jpegwrapper.hpp"
+
 #include "AprilTagWrapper.h"
 #include "Connection.h"
 #include "GUI.h"
@@ -26,6 +28,8 @@
 #include "MessageDialog.h"
 #include "Parameters.h"
 #include "Tracker.h"
+
+#define BUFFER_COUNT 8
 
 namespace {
 
@@ -231,6 +235,106 @@ int FrameDataOCV::cols() const
     return image.cols;
 }
 
+/* ------------------------- FrameDataV4L2 methods ------------------------- */
+
+void FrameDataV4L2::swap(std::unique_ptr<V4L2Wrapper::Buffer> &other)
+{
+    buf.swap(other);
+
+    if (buf)
+    {
+        JPEGWrapper::Decompress jpegDecompress;
+
+        jpegDecompress.setMemSource(static_cast<unsigned char *>(buf->Data()), buf->Size());
+        jpegDecompress.readHeader(true);
+
+        width = jpegDecompress.inputWidth();
+        height = jpegDecompress.inputHeight();
+    } else {
+        width = 0;
+        height = 0;
+    }
+}
+
+void FrameDataV4L2::swap(FrameData& other)
+{
+    try {
+        FrameDataV4L2& otherV4L2 = dynamic_cast<FrameDataV4L2&>(other);
+        swap(otherV4L2.buf);
+    }
+    catch (const std::bad_cast& e)
+    {
+        std::cout << "Caught exception: " << e.what() << std::endl;
+    }
+}
+
+void FrameDataV4L2::getImage(cv::Mat& out,
+                            bool grayscale,
+                            bool scale, int scale_num, int scale_denom,
+                            bool useRoi, const cv::Rect& roi)
+{
+    if (buf) {
+        JPEGWrapper::Decompress jpegDecompress;
+
+        jpegDecompress.setMemSource(static_cast<unsigned char *>(buf->Data()), buf->Size());
+        jpegDecompress.readHeader(true);
+        jpegDecompress.setColorspace(grayscale ? JCS_GRAYSCALE : JCS_EXT_BGR);
+        jpegDecompress.setDCTMethod(JDCT_IFAST);
+        jpegDecompress.setDoFancyUpsampling(false);
+        jpegDecompress.setDoBlockSmoothing(false);
+
+        if (scale)
+            jpegDecompress.setScale(scale_num, scale_denom);
+        else
+            jpegDecompress.setScale(1, 1);
+
+        jpegDecompress.start();
+
+        if (useRoi)
+            jpegDecompress.setCrop(roi.x, roi.y, roi.width, roi.height);
+
+        cv::Mat tmp;
+        tmp.create(jpegDecompress.outputHeight(),
+                   jpegDecompress.outputWidth(),
+                   grayscale ? CV_8UC1 : CV_8UC3);
+
+        jpegDecompress.read(tmp.ptr(), tmp.total() * tmp.elemSize());
+
+        /* JPEGWrapper might adjust the ROI position and size a little bit
+         * in order to perform the decoding. Here we adjust back the ROI to avoid
+         * unwanted offsets */
+        int adjust_x = roi.x - jpegDecompress.outputLeft();
+        int adjust_y = roi.y - jpegDecompress.outputTop();
+        if ((useRoi) &&
+            (adjust_x >= 0) && (adjust_y >= 0) &&
+            (adjust_x < jpegDecompress.outputLeft()) &&
+            (adjust_y < jpegDecompress.outputTop())) {
+            out = cv::Mat(tmp, cv::Rect(adjust_x, adjust_y,
+                                        jpegDecompress.outputWidth() - adjust_x,
+                                        jpegDecompress.outputHeight() - adjust_y));
+        } else {
+            out = tmp;
+        }
+
+        jpegDecompress.stop();
+    }
+}
+
+cv::Size FrameDataV4L2::size() const
+{
+    return cv::Size(width, height);
+}
+
+int FrameDataV4L2::rows() const
+{
+    return height;
+}
+
+int FrameDataV4L2::cols() const
+{
+    return width;
+}
+
 CameraOCV::CameraOCV(Tracker* tracker, GUI* gui, Parameters* parameters)
     : tracker(tracker)
     , gui(gui)
@@ -246,6 +350,23 @@ bool CameraOCV::isRunning()
 FrameData* CameraOCV::MakeFrame()
 {
     return new FrameDataOCV();
+}
+
+CameraV4L2::CameraV4L2(Tracker* tracker, GUI* gui, Parameters* parameters)
+    : tracker(tracker)
+    , gui(gui)
+    , parameters(parameters)
+{
+}
+
+bool CameraV4L2::isRunning()
+{
+    return cameraRunning;
+}
+
+FrameData* CameraV4L2::MakeFrame()
+{
+    return new FrameDataV4L2();
 }
 
 Tracker::Tracker(Parameters* params, Connection* conn, MyApp* app)
@@ -269,7 +390,7 @@ Tracker::Tracker(Parameters* params, Connection* conn, MyApp* app)
 void Tracker::SetGUI(GUI *gui)
 {
     this->gui = gui;
-    camera = new CameraOCV(this, gui, this->parameters);
+    camera = new CameraV4L2(this, gui, this->parameters);
 }
 
 void Tracker::StartCamera(std::string id, int apiPreference)
@@ -512,6 +633,250 @@ void CameraOCV::CopyFreshImageTo(FrameData& frame)
             // {
             //     cameraFrame.image.release();
             // }
+            frame.captureTime = cameraFrame->captureTime;
+            frame.swapTime = cameraFrame->swapTime;
+            frame.copyFreshTime = clock();
+            return;
+        }
+    }
+}
+
+void CameraV4L2::StartStop(std::string id, int apiPreference)
+{
+    if (cameraRunning)
+    {
+        cameraRunning = false;
+        //cameraThread.join();
+        sleep_millis(1000);
+        return;
+    }
+    if (id.length() <= 2)
+    {
+        //if camera address is a single character, try to open respective video device
+        int i = std::stoi(id);	//convert to int
+        std::stringstream ss;
+        ss << "/dev/video" << id;
+        dev.open(ss.str().c_str());
+    }
+    else
+    {
+        //if address is longer, we try to open it a path
+        dev.open(id.c_str());
+    }
+
+    if (!dev.isOpen())
+    {
+        goto error;
+    }
+
+    struct v4l2_format fmt;
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    fmt.fmt.pix.width = parameters->camWidth;
+    fmt.fmt.pix.height = parameters->camHeight;
+    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
+    fmt.fmt.pix.field = V4L2_FIELD_NONE;
+
+    if (dev.setFormat(fmt) == V4L2Wrapper::Error) {
+        goto error;
+    }
+
+    if (dev.createBuffers(BUFFER_COUNT) == V4L2Wrapper::Error) {
+        goto error;
+    }
+
+    if (dev.startStream(V4L2_BUF_TYPE_VIDEO_CAPTURE) == V4L2Wrapper::Error) {
+        goto error;
+    }
+
+    cameraRunning = true;
+    cameraThread = std::thread(&CameraV4L2::CameraLoop, this);
+    cameraThread.detach();
+    return;
+
+error:
+    wxMessageDialog dial(NULL,
+        parameters->language.TRACKER_CAMERA_START_ERROR, wxT("Error"), wxOK | wxICON_ERROR);
+    dial.ShowModal();
+    return;
+}
+
+void CameraV4L2::CameraLoop()
+{
+    bool previewShown = false;
+    if (parameters->rotateCl && parameters->rotateCounterCl)
+    {
+        tracker->rotate = true;
+        tracker->rotateFlag = cv::ROTATE_180;
+    }
+    else if (parameters->rotateCl)
+    {
+        tracker->rotate = true;
+        tracker->rotateFlag = cv::ROTATE_90_CLOCKWISE;
+    }
+    else if (parameters->rotateCounterCl)
+    {
+        tracker->rotate = true;
+        tracker->rotateFlag = cv::ROTATE_90_COUNTERCLOCKWISE;
+    }
+    cv::Mat drawImg;
+    double fps = 0;
+    clock_t last_frame_time = clock();
+    bool frame_visible = false;
+    int cols, rows;
+    int frame_count = 0;
+
+    FrameDataV4L2 frame;
+    cameraFrame.reset(new FrameDataV4L2());
+
+    setCameraParams();
+
+    while (cameraRunning)
+    {
+        {
+            auto buf = std::unique_ptr<V4L2Wrapper::Buffer>(new V4L2Wrapper::Buffer(dev));
+            if (buf->getStatus() == V4L2Wrapper::Error) {
+                gui->CallAfter([parameters=parameters] ()
+                               {
+                               wxMessageDialog dial(NULL,
+                                   parameters->language.TRACKER_CAMERA_ERROR, wxT("Error"), wxOK | wxICON_ERROR);
+                               dial.ShowModal();
+                               });
+                cameraRunning = false;
+                break;
+            }
+            frame.swap(buf);
+        }
+
+        if (frame_count == 0) {
+            setCameraParams();
+        }
+
+        clock_t curtime = clock();
+        fps = 0.95*fps + 0.05/(double(curtime - last_frame_time) / double(CLOCKS_PER_SEC));
+        last_frame_time = curtime;        
+
+        if (tracker->previewCamera || tracker->previewCameraCalibration)
+        {
+            std::string resolution = std::to_string(frame.cols()) + "x" + std::to_string(frame.rows());
+            int scale_denom = 1;
+            while (true) {
+                if (((frame.rows() / scale_denom) > tracker->drawImgSize) ||
+                    ((frame.cols() / scale_denom) > tracker->drawImgSize)) {
+                    scale_denom++;
+                } else {
+                    if (scale_denom > 1)
+                        scale_denom--;
+                    break;
+                }
+            }
+            frame.getImage(drawImg,
+                           false,
+                           true, 1, scale_denom,
+                           false, cv::Rect());
+            cv::putText(drawImg, std::to_string((int)(fps + (0.5))), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
+            cv::putText(drawImg, resolution, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
+            cv::line(drawImg, cv::Point(drawImg.cols/2, 0), cv::Point(drawImg.cols/2, drawImg.rows), cv::Scalar(0, 0, 255));
+            cv::line(drawImg, cv::Point(0, drawImg.rows/2), cv::Point(drawImg.cols, drawImg.rows/2), cv::Scalar(0, 0, 255));
+            if (tracker->previewCameraCalibration)
+            {
+                cv::Mat *outImg = new cv::Mat();
+                previewCalibration(drawImg, parameters);
+                drawImg.copyTo(*outImg);
+                gui->CallAfter([outImg] ()
+                               {
+                               cv::imshow("Preview", *outImg);
+                               cv::waitKey(1);
+                               delete(outImg);
+                               });
+                previewShown = true;
+            }
+            else
+            {
+                cv::Mat *outImg = new cv::Mat();
+                drawImg.copyTo(*outImg);
+                gui->CallAfter([outImg] ()
+                               {
+                               cv::imshow("Preview", *outImg);
+                               cv::waitKey(1);
+                               delete(outImg);
+                               });
+                previewShown = true;
+            }
+            frame_visible = true;
+        }
+        else if (previewShown) 
+        {
+            gui->CallAfter([] ()
+                           {
+                           cv::destroyWindow("Preview");
+                           });
+            previewShown = false;
+        }
+        {
+            std::unique_lock<std::mutex> lock(cameraFrameMutex);
+
+            cameraFrame->swap(frame);
+
+            cameraFrame->ready = true;
+            cameraFrame->captureTime = last_frame_time;
+            cameraFrame->swapTime = clock();
+        }
+        cameraFrameCondVar.notify_one();
+        frame_count++;
+    }
+    gui->CallAfter([] ()
+                   {
+                   cv::destroyAllWindows();
+                   });
+    cameraFrame.reset();
+    dev.stopStream(V4L2_BUF_TYPE_VIDEO_CAPTURE);
+    dev.close();
+}
+
+void CameraV4L2::setCameraParams()
+{
+#if 0
+    dev << v4l2_control{ V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL }
+        << v4l2_control{ V4L2_CID_EXPOSURE_ABSOLUTE, 30 }
+        << v4l2_control{ V4L2_CID_FOCUS_AUTO, 0 }
+        << v4l2_control{ V4L2_CID_FOCUS_ABSOLUTE, 160 }
+        << v4l2_control{ V4L2_CID_BRIGHTNESS, 64 }
+        << v4l2_control{ V4L2_CID_CONTRAST, 20 }
+        << v4l2_control{ V4L2_CID_SATURATION, 0 }
+        << v4l2_control{ V4L2_CID_AUTO_WHITE_BALANCE, 0 }
+        << v4l2_control{ V4L2_CID_GAMMA, 100 }
+        << v4l2_control{ V4L2_CID_POWER_LINE_FREQUENCY, V4L2_CID_POWER_LINE_FREQUENCY_DISABLED }
+        << v4l2_control{ V4L2_CID_WHITE_BALANCE_TEMPERATURE, 4600 }
+        << v4l2_control{ V4L2_CID_SHARPNESS, 2 }
+        << v4l2_control{ V4L2_CID_BACKLIGHT_COMPENSATION, 0 };
+#else
+    dev << v4l2_control{ V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_SHUTTER_PRIORITY }
+        << v4l2_control{ V4L2_CID_EXPOSURE_ABSOLUTE, 7 }
+        << v4l2_control{ V4L2_CID_BRIGHTNESS, 128 }
+        << v4l2_control{ V4L2_CID_CONTRAST, 128 }
+        << v4l2_control{ V4L2_CID_SATURATION, 1 }
+        << v4l2_control{ V4L2_CID_AUTO_WHITE_BALANCE, 0 }
+        << v4l2_control{ V4L2_CID_GAIN, 10 }
+        << v4l2_control{ V4L2_CID_POWER_LINE_FREQUENCY, V4L2_CID_POWER_LINE_FREQUENCY_60HZ }
+        << v4l2_control{ V4L2_CID_WHITE_BALANCE_TEMPERATURE, 4600 }
+        << v4l2_control{ V4L2_CID_SHARPNESS, 1 }
+        << v4l2_control{ V4L2_CID_BACKLIGHT_COMPENSATION, 0 };
+#endif
+}
+
+void CameraV4L2::CopyFreshImageTo(FrameData& frame)
+{
+    {
+        std::unique_lock<std::mutex> lock(cameraFrameMutex);
+        if (!(cameraFrame && cameraFrame->ready))
+        {
+            cameraFrameCondVar.wait(lock, [&]{ return cameraFrame && cameraFrame->ready; });
+        }
+        {
+            cameraFrame->ready = false;
+            frame.ready = true;
+            // Swap metadata and pointers to pixel buffers.
+            frame.swap(*cameraFrame);
             frame.captureTime = cameraFrame->captureTime;
             frame.swapTime = cameraFrame->swapTime;
             frame.copyFreshTime = clock();

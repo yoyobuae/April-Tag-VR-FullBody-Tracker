@@ -13,6 +13,8 @@
 #include <opencv2/core.hpp>
 #include <opencv2/videoio.hpp>
 
+#include "v4l2wrapper.hpp"
+
 #include "MyApp.h"
 
 #include "Quaternion.h"
@@ -143,6 +145,27 @@ public:
     virtual int cols() const override;
 };
 
+class FrameDataV4L2 : public FrameData
+{
+    std::unique_ptr<V4L2Wrapper::Buffer> buf;
+    int width = -1;
+    int height = -1;
+
+public:
+    virtual ~FrameDataV4L2() { }
+
+    void swap(std::unique_ptr<V4L2Wrapper::Buffer> &other);
+
+    virtual void swap(FrameData& other) override;
+    virtual void getImage(cv::Mat &out,
+                          bool grayscale,
+                          bool scale, int scale_num, int scale_denom,
+                          bool useRoi, const cv::Rect& roi) override;
+    virtual cv::Size size() const override;
+    virtual int rows() const override;
+    virtual int cols() const override;
+};
+
 class Camera {
 public:
     virtual ~Camera() { }
@@ -181,6 +204,32 @@ public:
     virtual void CopyFreshImageTo(FrameData& frame) override;
 };
 
+class CameraV4L2 : public Camera {
+
+    GUI *gui;
+    Tracker* tracker;
+    Parameters *parameters;
+    std::string id;
+    int apiPreference;
+    V4L2Wrapper::Device dev;
+    bool cameraRunning;
+    std::thread cameraThread;
+    std::mutex cameraFrameMutex;
+    std::condition_variable cameraFrameCondVar;
+    std::unique_ptr<FrameDataV4L2> cameraFrame;
+
+    void CameraLoop();
+    void setCameraParams();
+
+public:
+    CameraV4L2(Tracker* tracker, GUI* gui, Parameters* parameters);
+    virtual ~CameraV4L2() { }
+
+    virtual void StartStop(std::string id, int apiPreference) override;
+    virtual bool isRunning() override;
+    virtual FrameData* MakeFrame() override;
+    virtual void CopyFreshImageTo(FrameData& frame) override;
+};
 
 class Connection;
 class GUI;
