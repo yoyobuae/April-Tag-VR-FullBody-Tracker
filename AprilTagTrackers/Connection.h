@@ -35,6 +35,7 @@ public:
     int status = DISCONNECTED;
     vr::IVRSystem* openvr_handle;
     std::vector<TrackerConnection> connectedTrackers;
+    int cameraId = 0;
     bool disableOpenVrApi = true;
     GUI* gui;
 private:

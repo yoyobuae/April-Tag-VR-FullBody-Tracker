@@ -269,6 +269,12 @@ void Connection::Connect()
     }
 
     ret = Send("addstation");
+    ret >> word;
+    if (word == "added")
+    {
+        ret >> cameraId;
+        printf("cam_idx: %d\n", cameraId);
+    }
 
     /*
     std::string sstr = "";
@@ -302,7 +308,8 @@ std::istringstream Connection::SendTracker(int id, double a, double b, double c,
         " " + std::to_string(qy) +
         " " + std::to_string(qz) +
         " " + std::to_string(time) +
-        " " + std::to_string(smoothing) + "\n";
+        " " + std::to_string(smoothing) +
+        " " + std::to_string(cameraId) + "\n";
 
     //send the string to our driver
 
