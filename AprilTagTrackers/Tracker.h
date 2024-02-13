@@ -111,6 +111,10 @@ public:
     clock_t getPoseTime;
     clock_t processPoseTime;
     clock_t doMaskTime;
+    clock_t preJpegTime;
+    clock_t jpegTime;
+    clock_t apriltagTime;
+    clock_t postApriltagTime;
     clock_t detectTime;
     clock_t sendTrackerTime;
 

@@ -2436,12 +2436,22 @@ void Tracker::MainLoop()
         ids.clear();
         centers.clear();
 
+        double detector_pre_jpeg = 0.0;
+        double detector_jpeg = 0.0;
+        double detector_apriltag = 0.0;
+        double detector_post_apriltag = 0.0;
         // Run the apriltag detector
         if (doMasking) {
             for (int i = 0; i < trackerNum; i++)
             {
                 for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
                 {
+                    double detector_start = clock();
+                    double detector_mid0 = detector_start;
+                    double detector_mid1 = detector_start;
+                    double detector_mid2 = detector_start;
+                    double detector_end = detector_start;
+
                     if (trackerStatus[i].maskCenters[j].x <= 0 ||
                         trackerStatus[i].maskCenters[j].y <= 0 ||
                         trackerStatus[i].maskCenters[j].x >= rotated_cols ||
@@ -2496,11 +2506,14 @@ void Tracker::MainLoop()
                         if ((w >= 8) && (h >= 8))
                         {
                             cv::Mat detectGray;
+                            detector_mid0 = clock();
                             frame->getImage(detectGray,
                                             true,
                                             false, 1, 1,
                                             true, roi);
+                            detector_mid1 = clock();
                             april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
+                            detector_mid2 = clock();
                             drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
 
                             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
@@ -2530,11 +2543,21 @@ void Tracker::MainLoop()
                             }
                         }
                     }
+                    detector_end = clock();
+                    detector_pre_jpeg += detector_mid0 - detector_start;
+                    detector_jpeg += detector_mid1 - detector_start;
+                    detector_apriltag += detector_mid2 - detector_start;
+                    detector_post_apriltag += detector_mid2 - detector_start;
                 }
             }
         }
         if (!(doMasking && circularWindow))
         {
+            double detector_start = clock();
+            double detector_mid0 = detector_start;
+            double detector_mid1 = detector_start;
+            double detector_mid2 = detector_start;
+            double detector_end = detector_start;
             static int quadrant = 0;
             int left = (quadrant % 4) * frame->cols()/4;
             int top = ((quadrant / 4) % 4) * frame->rows()/4;
@@ -2548,11 +2571,14 @@ void Tracker::MainLoop()
             std::vector<cv::Point2f> temp_centers;
 
             cv::Mat detectGray;
+            detector_mid0 = clock();
             frame->getImage(detectGray,
                             true,
                             false, 1, 1,
                             true, roi);
+            detector_mid1 = clock();
             april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
+            detector_mid2 = clock();
 
             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
             {
@@ -2580,8 +2606,17 @@ void Tracker::MainLoop()
                 centers.push_back(temp_centers[k]);
             }
             quadrant = (quadrant + 1) % 16;
+            detector_end = clock();
+            detector_pre_jpeg += detector_mid0 - detector_start;
+            detector_jpeg += detector_mid1 - detector_start;
+            detector_apriltag += detector_mid2 - detector_start;
+            detector_post_apriltag += detector_mid2 - detector_start;
         }
 
+        frame->preJpegTime = frame->doMaskTime + detector_pre_jpeg;
+        frame->jpegTime = frame->doMaskTime + detector_jpeg;
+        frame->apriltagTime = frame->doMaskTime + detector_apriltag;
+        frame->postApriltagTime = frame->doMaskTime + detector_post_apriltag;
         frame->detectTime = clock();
 
         // Store a snapshot image of each tracker
@@ -3127,6 +3162,10 @@ void Tracker::MainLoop()
                 int toGrayMsecs = int(20000.0 * double(frame->toGrayTime - frame->captureTime) / double(CLOCKS_PER_SEC));
                 int processPoseMsecs = int(20000.0 * double(frame->processPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
                 int doMaskMsecs = int(20000.0 * double(frame->doMaskTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int preJpegMsecs = int(20000.0 * double(frame->preJpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int jpegMsecs = int(20000.0 * double(frame->jpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int apriltagMsecs = int(20000.0 * double(frame->apriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+                int postApriltagMsecs = int(20000.0 * double(frame->postApriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
                 int detectMsecs = int(20000.0 * double(frame->detectTime - frame->captureTime) / double(CLOCKS_PER_SEC));
                 int sendTrackerMsecs = int(20000.0 * double(frame->sendTrackerTime - frame->captureTime) / double(CLOCKS_PER_SEC));
 
@@ -3137,8 +3176,12 @@ void Tracker::MainLoop()
                 rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs), cv::Scalar(51, 140, 117), -1);     // Green
                 rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs), cv::Scalar(20, 89, 152), -1); // Brown
                 rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);     // Green
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - detectMsecs),      cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - preJpegMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - preJpegMsecs),     cv::Point(statsCurX + 2, statsImg.rows - jpegMsecs), cv::Scalar(133, 178, 208), -1);      // Light Brown
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - jpegMsecs),        cv::Point(statsCurX + 2, statsImg.rows - apriltagMsecs), cv::Scalar(23, 73, 207), -1);    // Orange
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - apriltagMsecs),    cv::Point(statsCurX + 2, statsImg.rows - postApriltagMsecs), cv::Scalar(140, 117, 45), -1);// Blue
+                //rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - apriltagMsecs),    cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);   // Green
+                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - postApriltagMsecs),cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
 
                 if (statsCurX % 20 > 15) {
                     for (int y = 99 ; y < 1000; y += 100) {
