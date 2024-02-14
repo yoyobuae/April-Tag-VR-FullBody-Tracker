@@ -2438,19 +2438,31 @@ void Tracker::MainLoop()
 
         double detector_pre_jpeg = 0.0;
         double detector_jpeg = 0.0;
+        double detector_post_jpeg = 0.0;
+        double detector_pre_apriltag = 0.0;
         double detector_apriltag = 0.0;
         double detector_post_apriltag = 0.0;
-        // Run the apriltag detector
+
+        cv::Rect scanRoi;
+        cv::Mat scanImage;
+
+        // Get images for regions-of-interest
         if (doMasking) {
             for (int i = 0; i < trackerNum; i++)
             {
+                trackerStatus[i].maskedRois.clear();
+                trackerStatus[i].maskedImages.clear();
+
                 for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
                 {
                     double detector_start = clock();
                     double detector_mid0 = detector_start;
                     double detector_mid1 = detector_start;
-                    double detector_mid2 = detector_start;
                     double detector_end = detector_start;
+
+                    trackerStatus[i].maskedRois.push_back(cv::Rect());
+                    trackerStatus[i].maskedImages.push_back(cv::Mat());
+
 
                     if (trackerStatus[i].maskCenters[j].x <= 0 ||
                         trackerStatus[i].maskCenters[j].y <= 0 ||
@@ -2501,7 +2513,8 @@ void Tracker::MainLoop()
                         std::vector<std::vector<cv::Point2f> > temp_corners;
                         std::vector<cv::Point2f> temp_centers;
 
-                        const int w = static_cast<int>(right - left), h = static_cast<int>(bottom - top);
+                        const int w = static_cast<int>(roi.width);
+                        const int h = static_cast<int>(roi.height);
 
                         if ((w >= 8) && (h >= 8))
                         {
@@ -2512,42 +2525,15 @@ void Tracker::MainLoop()
                                             false, 1, 1,
                                             true, roi);
                             detector_mid1 = clock();
-                            april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
-                            detector_mid2 = clock();
                             drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
-
-                            for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
-                            {
-                                bool alreadyDetected = false;
-                                for (int l = 0; l < ids.size(); l++)
-                                {
-                                    if (temp_ids[k] == ids[l])
-                                    {
-                                        alreadyDetected = true;
-                                        break;
-                                    }
-                                }
-                                if (alreadyDetected)
-                                    break;
-                                for (int l = 0; l < temp_corners[k].size(); l++)
-                                {
-                                    temp_corners[k][l].x += left;
-                                    temp_corners[k][l].y += top;
-                                }
-                                temp_centers[k].x += left;
-                                temp_centers[k].y += top;
-
-                                corners.push_back(temp_corners[k]);
-                                ids.push_back(temp_ids[k]);
-                                centers.push_back(temp_centers[k]);
-                            }
+                            trackerStatus[i].maskedRois[j] = roi;
+                            trackerStatus[i].maskedImages[j] = detectGray;
                         }
                     }
                     detector_end = clock();
                     detector_pre_jpeg += detector_mid0 - detector_start;
-                    detector_jpeg += detector_mid1 - detector_start;
-                    detector_apriltag += detector_mid2 - detector_start;
-                    detector_post_apriltag += detector_mid2 - detector_start;
+                    detector_jpeg += detector_mid1 - detector_mid0;
+                    detector_post_jpeg += detector_end - detector_mid1;
                 }
             }
         }
@@ -2556,7 +2542,6 @@ void Tracker::MainLoop()
             double detector_start = clock();
             double detector_mid0 = detector_start;
             double detector_mid1 = detector_start;
-            double detector_mid2 = detector_start;
             double detector_end = detector_start;
             static int quadrant = 0;
             int left = (quadrant % 4) * frame->cols()/4;
@@ -2577,8 +2562,105 @@ void Tracker::MainLoop()
                             false, 1, 1,
                             true, roi);
             detector_mid1 = clock();
+
+            scanRoi = roi;
+            scanImage = detectGray;
+
+            quadrant = (quadrant + 1) % 16;
+            detector_end = clock();
+            detector_pre_jpeg += detector_mid0 - detector_start;
+            detector_jpeg += detector_mid1 - detector_mid0;
+            detector_post_jpeg += detector_end - detector_mid1;
+        }
+
+        // Run the apriltag detector
+        if (doMasking) {
+            for (int i = 0; i < trackerNum; i++)
+            {
+                for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
+                {
+                    double detector_start = clock();
+                    double detector_mid0 = detector_start;
+                    double detector_mid1 = detector_start;
+                    double detector_end = detector_start;
+
+                    if (trackerStatus[i].maskCenters[j].x <= 0 ||
+                        trackerStatus[i].maskCenters[j].y <= 0 ||
+                        trackerStatus[i].maskCenters[j].x >= rotated_cols ||
+                        trackerStatus[i].maskCenters[j].y >= rotated_rows)
+                    {
+                        continue;
+                    }
+                    if (trackerStatus[i].searchSize > 0)
+                    {
+
+                        std::vector<int> temp_ids;
+                        std::vector<std::vector<cv::Point2f> > temp_corners;
+                        std::vector<cv::Point2f> temp_centers;
+
+                        cv::Rect roi = trackerStatus[i].maskedRois[j];
+                        cv::Mat detectGray = trackerStatus[i].maskedImages[j];
+
+                        const int w = static_cast<int>(roi.width);
+                        const int h = static_cast<int>(roi.height);
+
+                        if ((w >= 8) && (h >= 8))
+                        {
+                            detector_mid0 = clock();
+                            april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
+                            detector_mid1 = clock();
+
+                            for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
+                            {
+                                bool alreadyDetected = false;
+                                for (int l = 0; l < ids.size(); l++)
+                                {
+                                    if (temp_ids[k] == ids[l])
+                                    {
+                                        alreadyDetected = true;
+                                        break;
+                                    }
+                                }
+                                if (alreadyDetected)
+                                    break;
+                                for (int l = 0; l < temp_corners[k].size(); l++)
+                                {
+                                    temp_corners[k][l].x += roi.x;
+                                    temp_corners[k][l].y += roi.y;
+                                }
+                                temp_centers[k].x += roi.x;
+                                temp_centers[k].y += roi.y;
+
+                                corners.push_back(temp_corners[k]);
+                                ids.push_back(temp_ids[k]);
+                                centers.push_back(temp_centers[k]);
+                            }
+                        }
+                    }
+                    detector_end = clock();
+                    detector_pre_apriltag += detector_mid0 - detector_start;
+                    detector_apriltag += detector_mid1 - detector_mid0;
+                    detector_post_apriltag += detector_end - detector_mid1;
+                }
+            }
+        }
+        if (!(doMasking && circularWindow))
+        {
+            double detector_start = clock();
+            double detector_mid0 = detector_start;
+            double detector_mid1 = detector_start;
+            double detector_end = detector_start;
+
+            cv::Rect roi = scanRoi;
+            cv::Mat detectGray = scanImage;
+
+            std::vector<int> temp_ids;
+            std::vector<std::vector<cv::Point2f> > temp_corners;
+            std::vector<cv::Point2f> temp_centers;
+
+            detector_mid0 = clock();
             april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
-            detector_mid2 = clock();
+            detector_mid1 = clock();
 
             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
             {
@@ -2595,28 +2677,28 @@ void Tracker::MainLoop()
                     break;
                 for (int l = 0; l < temp_corners[k].size(); l++)
                 {
-                    temp_corners[k][l].x += left;
-                    temp_corners[k][l].y += top;
+                    temp_corners[k][l].x += roi.x;
+                    temp_corners[k][l].y += roi.y;
                 }
-                temp_centers[k].x += left;
-                temp_centers[k].y += top;
+                temp_centers[k].x += roi.x;
+                temp_centers[k].y += roi.y;
 
                 corners.push_back(temp_corners[k]);
                 ids.push_back(temp_ids[k]);
                 centers.push_back(temp_centers[k]);
             }
-            quadrant = (quadrant + 1) % 16;
             detector_end = clock();
-            detector_pre_jpeg += detector_mid0 - detector_start;
-            detector_jpeg += detector_mid1 - detector_start;
-            detector_apriltag += detector_mid2 - detector_start;
-            detector_post_apriltag += detector_mid2 - detector_start;
+            detector_pre_apriltag += detector_mid0 - detector_start;
+            detector_apriltag += detector_mid1 - detector_mid0;
+            detector_post_apriltag += detector_end - detector_mid1;
         }
 
         frame->preJpegTime = frame->doMaskTime + detector_pre_jpeg;
-        frame->jpegTime = frame->doMaskTime + detector_jpeg;
-        frame->apriltagTime = frame->doMaskTime + detector_apriltag;
-        frame->postApriltagTime = frame->doMaskTime + detector_post_apriltag;
+        frame->jpegTime = frame->preJpegTime + detector_jpeg;
+        frame->postJpegTime = frame->jpegTime + detector_post_jpeg;
+        frame->preApriltagTime = frame->postJpegTime + detector_pre_apriltag;
+        frame->apriltagTime = frame->preApriltagTime + detector_apriltag;
+        frame->postApriltagTime = frame->apriltagTime + detector_post_apriltag;
         frame->detectTime = clock();
 
         // Store a snapshot image of each tracker

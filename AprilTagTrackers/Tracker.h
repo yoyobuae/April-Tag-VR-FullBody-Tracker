@@ -86,6 +86,8 @@ struct TrackerStatus {
     std::vector<std::vector<double>> prevLocValues;
     std::vector<cv::Point2d> maskCenters;
     std::vector<int> maskSizes;
+    std::vector<cv::Rect> maskedRois;
+    std::vector<cv::Mat> maskedImages;
     std::chrono::milliseconds last_update_timestamp;
     int searchSize;
     int pose_valid;
@@ -113,6 +115,8 @@ public:
     clock_t doMaskTime;
     clock_t preJpegTime;
     clock_t jpegTime;
+    clock_t postJpegTime;
+    clock_t preApriltagTime;
     clock_t apriltagTime;
     clock_t postApriltagTime;
     clock_t detectTime;
