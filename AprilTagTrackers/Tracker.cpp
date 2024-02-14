@@ -3234,54 +3234,6 @@ void Tracker::MainLoop()
             end = clock();
             double frameTime = double(end - start) / double(CLOCKS_PER_SEC);
 
-            if (showTimeProfile)
-            {
-                cv::Mat *outImg = new cv::Mat();
-
-                int frameWriteMsecs = int(20000.0 * double(frame->swapTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int frameReadMsecs = int(20000.0 * double(frame->copyFreshTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int getPoseMsecs = int(20000.0 * double(frame->getPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int toGrayMsecs = int(20000.0 * double(frame->toGrayTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int processPoseMsecs = int(20000.0 * double(frame->processPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int doMaskMsecs = int(20000.0 * double(frame->doMaskTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int preJpegMsecs = int(20000.0 * double(frame->preJpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int jpegMsecs = int(20000.0 * double(frame->jpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int apriltagMsecs = int(20000.0 * double(frame->apriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int postApriltagMsecs = int(20000.0 * double(frame->postApriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int detectMsecs = int(20000.0 * double(frame->detectTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-                int sendTrackerMsecs = int(20000.0 * double(frame->sendTrackerTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-
-                rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows), cv::Scalar(0, 0, 0), -1);                        // Clear
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs), cv::Scalar(133, 178, 208), -1);// Light Brown
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs), cv::Scalar(23, 73, 207), -1);   // Orange
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs), cv::Scalar(51, 140, 117), -1);     // Green
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs), cv::Scalar(20, 89, 152), -1); // Brown
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - preJpegMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - preJpegMsecs),     cv::Point(statsCurX + 2, statsImg.rows - jpegMsecs), cv::Scalar(133, 178, 208), -1);      // Light Brown
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - jpegMsecs),        cv::Point(statsCurX + 2, statsImg.rows - apriltagMsecs), cv::Scalar(23, 73, 207), -1);    // Orange
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - apriltagMsecs),    cv::Point(statsCurX + 2, statsImg.rows - postApriltagMsecs), cv::Scalar(140, 117, 45), -1);// Blue
-                //rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - apriltagMsecs),    cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);   // Green
-                rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - postApriltagMsecs),cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
-
-                if (statsCurX % 20 > 15) {
-                    for (int y = 99 ; y < 1000; y += 100) {
-                        rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - y),  cv::Point(statsCurX + 2, statsImg.rows - y + 2), cv::Scalar(0, 0, 0), -1);
-                    }
-                }
-
-                statsCurX += 3;
-                statsCurX = (statsCurX >= 2000) ? 0 : statsCurX;
-
-                statsImg.copyTo(*outImg);
-                gui->CallAfter([outImg] ()
-                               {
-                               cv::imshow("stats", *outImg);
-                               cv::waitKey(1);
-                               delete(outImg);
-                               });
-            }
 
             int cols, rows;
             if (frame->cols() < frame->rows())
@@ -3319,6 +3271,59 @@ void Tracker::MainLoop()
                            });
         }
         drawUiFuncs.clear();
+
+        if (showTimeProfile)
+        {
+            cv::Mat *outImg = new cv::Mat();
+
+            int frameWriteMsecs = int(10000.0 * double(frame->swapTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int frameReadMsecs = int(10000.0 * double(frame->copyFreshTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int getPoseMsecs = int(10000.0 * double(frame->getPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int toGrayMsecs = int(10000.0 * double(frame->toGrayTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int processPoseMsecs = int(10000.0 * double(frame->processPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int doMaskMsecs = int(10000.0 * double(frame->doMaskTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int preJpegMsecs = int(10000.0 * double(frame->preJpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int jpegMsecs = int(10000.0 * double(frame->jpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int postJpegMsecs = int(10000.0 * double(frame->postJpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int preApriltagMsecs = int(10000.0 * double(frame->preApriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int apriltagMsecs = int(10000.0 * double(frame->apriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int postApriltagMsecs = int(10000.0 * double(frame->postApriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int detectMsecs = int(10000.0 * double(frame->detectTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int sendTrackerMsecs = int(10000.0 * double(frame->sendTrackerTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+
+            rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows), cv::Scalar(0, 0, 0), -1);                        // Clear
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs), cv::Scalar(133, 178, 208), -1);// Light Brown
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs), cv::Scalar(23, 73, 207), -1);   // Orange
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs), cv::Scalar(51, 140, 117), -1);     // Green
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs), cv::Scalar(20, 89, 152), -1); // Brown
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs), cv::Scalar(61, 172, 249), -1);     // Yellow
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - preJpegMsecs), cv::Scalar(140, 117, 45), -1);    // Blue
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - preJpegMsecs),     cv::Point(statsCurX + 2, statsImg.rows - jpegMsecs), cv::Scalar(133, 178, 208), -1);      // Light Brown
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - jpegMsecs),        cv::Point(statsCurX + 2, statsImg.rows - postJpegMsecs), cv::Scalar(51, 140, 117), -1);   // Green
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - postJpegMsecs),    cv::Point(statsCurX + 2, statsImg.rows - preApriltagMsecs), cv::Scalar(61, 172, 249), -1);// Yellow
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - preApriltagMsecs), cv::Point(statsCurX + 2, statsImg.rows - apriltagMsecs), cv::Scalar(23, 73, 207), -1);    // Orange
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - apriltagMsecs),    cv::Point(statsCurX + 2, statsImg.rows - postApriltagMsecs), cv::Scalar(140, 117, 45), -1);// Blue
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - postApriltagMsecs),cv::Point(statsCurX + 2, statsImg.rows - detectMsecs), cv::Scalar(51, 140, 117), -1);     // Green
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - detectMsecs),      cv::Point(statsCurX + 2, statsImg.rows - sendTrackerMsecs), cv::Scalar(20, 89, 152), -1); // Brown
+
+            if (statsCurX % 20 > 15) {
+                for (int y = 99 ; y < 1000; y += 100) {
+                    rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - y),  cv::Point(statsCurX + 2, statsImg.rows - y + 2), cv::Scalar(0, 0, 0), -1);
+                }
+            }
+
+            statsCurX += 3;
+            statsCurX = (statsCurX >= 2000) ? 0 : statsCurX;
+
+            statsImg.copyTo(*outImg);
+            gui->CallAfter([outImg] ()
+                           {
+                           cv::imshow("stats", *outImg);
+                           cv::waitKey(1);
+                           delete(outImg);
+                           });
+        }
         //time of marker detection
     }
     gui->CallAfter([] ()
