@@ -1,3 +1,7 @@
 /build
+/build.backup
+*.photos
+/python
 /.vs
 /.vscode
+.venv
