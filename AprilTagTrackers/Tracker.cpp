@@ -836,16 +836,30 @@ void CameraV4L2::CameraLoop()
 
 void CameraV4L2::setCameraParams()
 {
-#if 0
+#if 1
     dev << v4l2_control{ V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL }
-        << v4l2_control{ V4L2_CID_EXPOSURE_ABSOLUTE, 30 }
+        << v4l2_control{ V4L2_CID_EXPOSURE_ABSOLUTE, 20 }
         << v4l2_control{ V4L2_CID_FOCUS_AUTO, 0 }
         << v4l2_control{ V4L2_CID_FOCUS_ABSOLUTE, 160 }
         << v4l2_control{ V4L2_CID_BRIGHTNESS, 64 }
         << v4l2_control{ V4L2_CID_CONTRAST, 20 }
         << v4l2_control{ V4L2_CID_SATURATION, 0 }
         << v4l2_control{ V4L2_CID_AUTO_WHITE_BALANCE, 0 }
-        << v4l2_control{ V4L2_CID_GAMMA, 100 }
+        << v4l2_control{ V4L2_CID_GAMMA, 110 }
+        << v4l2_control{ V4L2_CID_POWER_LINE_FREQUENCY, V4L2_CID_POWER_LINE_FREQUENCY_DISABLED }
+        << v4l2_control{ V4L2_CID_WHITE_BALANCE_TEMPERATURE, 4600 }
+        << v4l2_control{ V4L2_CID_SHARPNESS, 2 }
+        << v4l2_control{ V4L2_CID_BACKLIGHT_COMPENSATION, 0 };
+#elif 0
+    dev << v4l2_control{ V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL }
+        << v4l2_control{ V4L2_CID_EXPOSURE_ABSOLUTE, 10 }
+        << v4l2_control{ V4L2_CID_FOCUS_AUTO, 0 }
+        << v4l2_control{ V4L2_CID_FOCUS_ABSOLUTE, 160 }
+        << v4l2_control{ V4L2_CID_BRIGHTNESS, 64 }
+        << v4l2_control{ V4L2_CID_CONTRAST, 20 }
+        << v4l2_control{ V4L2_CID_SATURATION, 0 }
+        << v4l2_control{ V4L2_CID_AUTO_WHITE_BALANCE, 0 }
+        << v4l2_control{ V4L2_CID_GAMMA, 110 }
         << v4l2_control{ V4L2_CID_POWER_LINE_FREQUENCY, V4L2_CID_POWER_LINE_FREQUENCY_DISABLED }
         << v4l2_control{ V4L2_CID_WHITE_BALANCE_TEMPERATURE, 4600 }
         << v4l2_control{ V4L2_CID_SHARPNESS, 2 }
