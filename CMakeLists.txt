@@ -35,6 +35,11 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT A
 add_subdirectory("MulticamCalibrator")
 add_dependencies("MulticamCalibrator" "apriltags")
 add_dependencies("MulticamCalibrator" "wxbase" "wxcore" "wxnet")
+
+add_subdirectory("LevelCalibrator")
+add_dependencies("LevelCalibrator" "apriltags")
+add_dependencies("LevelCalibrator" "wxbase" "wxcore" "wxnet")
+
 add_subdirectory("AprilTagRouter")
 
 message("APRILTAG_INCLUDE_DIR: ${APRILTAG_INCLUDE_DIR}")
