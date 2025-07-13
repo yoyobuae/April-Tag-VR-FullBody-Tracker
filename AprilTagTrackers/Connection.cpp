@@ -281,7 +281,7 @@ void Connection::Connect()
     sstr += "settings 120 " + std::to_string(parameters->smoothingFactor);
     */
 
-    ret = Send("settings 120 " + std::to_string(parameters->smoothingFactor) + " " + std::to_string(parameters->additionalSmoothing));
+    ret = Send("settings 200 " + std::to_string(parameters->smoothingFactor) + " " + std::to_string(parameters->additionalSmoothing));
     //set that connection is established
     status = CONNECTED;
 
