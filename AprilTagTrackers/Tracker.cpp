@@ -1912,7 +1912,14 @@ void Tracker::MainLoop()
                 ret >> trackerStatus[i].pose_valid;
 
 
-                TrackerPose pose_to_store = pose_from_driver - trackerStatus[i].pose_delta_average;
+                if (parameters->cameraCalibAutoAdjust)
+                {
+                    TrackerPose pose_to_store = pose_from_driver - trackerStatus[i].pose_delta_average;
+                }
+                else
+                {
+                    TrackerPose pose_to_store = pose_from_driver;
+                }
 
                 trackerStatus[i].a = pose_to_store.a;
                 trackerStatus[i].b = pose_to_store.b;
@@ -3006,7 +3013,14 @@ void Tracker::MainLoop()
                 pose_local.qy = q.y;
                 pose_local.qz = q.z;
 
-                TrackerPose pose_to_send = pose_local + trackerStatus[i].pose_delta_average;
+                if (parameters->cameraCalibAutoAdjust)
+                {
+                    TrackerPose pose_to_send = pose_local + trackerStatus[i].pose_delta_average;
+                }
+                else
+                {
+                    TrackerPose pose_to_send = pose_local;
+                }
 
                 //frame time is how much time passed since frame was acquired.
                 std::istringstream ret = connection->SendTracker(connection->connectedTrackers[i].DriverId,

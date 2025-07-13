@@ -67,6 +67,7 @@ public:
     int languageSelection = 0;
     double calibScale = 1;
     std::string ipcAddr = "ApriltagPipeIn";
+    bool cameraCalibAutoAdjust = true;
 
 
     cv::Ptr<cv::aruco::DetectorParameters> aruco_params = cv::aruco::DetectorParameters::create();

@@ -109,6 +109,7 @@ void Parameters::Load()
         if (calibScale < 0.5)
             calibScale = 1;
         fs["ipcAddr"] >> ipcAddr;
+        fs["cameraCalibAutoAdjust"] >> cameraCalibAutoAdjust;
         if(!wrotmat.empty())
             wrotation = Quaternion<double>(wrotmat.at<double>(0), wrotmat.at<double>(1), wrotmat.at<double>(2), wrotmat.at<double>(3));
         fn = fs["trackers"];
@@ -229,6 +230,7 @@ void Parameters::Save()
     fs << "languageSelection" << languageSelection;
     fs << "calibScale" << calibScale;
     fs << "ipcAddr" << ipcAddr;
+    fs << "cameraCalibAutoAdjust" << cameraCalibAutoAdjust;
 
     fs << "trackers";
     fs << "{";
