@@ -1691,44 +1691,81 @@ void Tracker::MainLoop1()
                     cv::Mat rpos = (cv::Mat_<double>(4, 1) << point1[1].x, point1[1].y, point1[1].z, 1);
                     rpos = wtranslation1 * rpos;
 
-                    calibratorPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
-                    calibratorTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+                    cv::Point3d curPoint1;
 
-                    if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
-                    {
-                        cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
-                        wtranslation2 = wtranslation * wtranslation2;
-                        cv::Mat R = (cv::Mat_<double>(3, 3) <<
-                                                 wtranslation2.at<double>(0, 0), wtranslation2.at<double>(0, 1), wtranslation2.at<double>(0, 2),
-                                                 wtranslation2.at<double>(1, 0), wtranslation2.at<double>(1, 1), wtranslation2.at<double>(1, 2),
-                                                 wtranslation2.at<double>(2, 0), wtranslation2.at<double>(2, 1), wtranslation2.at<double>(2, 2));
-                        wrotation2 =  mRot2Quat(R);
-                        HMatrix H = { R.at<double>(0, 0), R.at<double>(1, 0), R.at<double>(2, 0), 0,
-                                      R.at<double>(0, 1), R.at<double>(1, 1), R.at<double>(2, 1), 0,
-                                      R.at<double>(0, 2), R.at<double>(1, 2), R.at<double>(2, 2), 0,
-                                      0,                  0,                  0,                  1 };
-                        auto eulerAngles = Eul_FromHMatrix(H, EulOrdYXZr);
+                    curPoint1.x = rpos.at<double>(0,0);
+                    curPoint1.y = rpos.at<double>(1,0);
+                    curPoint1.z = rpos.at<double>(2,0);
 
-                        parameters->wrotation2 = wrotation2;
-                        parameters->wtranslation2 = wtranslation2;
-                        parameters->calibOffsetX2 = 100 * wtranslation2.at<double>(0, 3);
-                        parameters->calibOffsetY2 = 100 * wtranslation2.at<double>(1, 3);
-                        parameters->calibOffsetZ2 = 100 * wtranslation2.at<double>(2, 3);
-                        parameters->calibOffsetA2 = -(180.0/M_PI) * eulerAngles.z;
-                        parameters->calibOffsetB2 = -(180.0/M_PI) * eulerAngles.x;
-                        parameters->calibOffsetC2 = (180.0/M_PI) * eulerAngles.y;
-                        parameters->Save();
+                    cv::Point3d delta1 = curPoint1 - prevPoint1;
+                    prevPoint1 = curPoint1;
 
-                        calibratorProjected1.clear();
-                        calibratorProjected2.clear();
-                        calibratorReprojected1.clear();
-                        calibratorReprojected2.clear();
-                        calibratorPoints1.clear();
-                        calibratorPoints2.clear();
-                        calibratorTimes1.clear();
-                        calibratorTimes2.clear();
-                        
-                        pointsThreshold += 1000;
+                    double distance1 = sqrt(delta1.x * delta1.x + delta1.y * delta1.y + delta1.z * delta1.z);
+                    speed1 = speed1 * 0.9 + distance1 * 0.1;
+
+                    bool startResting = false;
+                    bool stopResting = false;
+
+                    if ((speed1 < 0.003) && (!isResting1)) {
+                        startResting = true;
+                    }
+
+                    if ((speed1 > 0.009) && (isResting1)) {
+                        stopResting = true;
+                    }
+
+                    if (startResting) {
+                        printf("start resting 1\n");
+                        isResting1 = true;
+                        avgPoints1.push_back(curPoint1);
+                    }
+
+                    if (stopResting) {
+                        printf("stop resting 1\n");
+                        isResting1 = false;
+                    }
+
+                    if (isResting1 || isResting2) {
+                        calibratorPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
+                        calibratorTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+
+                        if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
+                        {
+                            cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
+                            wtranslation2 = wtranslation * wtranslation2;
+                            cv::Mat R = (cv::Mat_<double>(3, 3) <<
+                                         wtranslation2.at<double>(0, 0), wtranslation2.at<double>(0, 1), wtranslation2.at<double>(0, 2),
+                                         wtranslation2.at<double>(1, 0), wtranslation2.at<double>(1, 1), wtranslation2.at<double>(1, 2),
+                                         wtranslation2.at<double>(2, 0), wtranslation2.at<double>(2, 1), wtranslation2.at<double>(2, 2));
+                            wrotation2 =  mRot2Quat(R);
+                            HMatrix H = { R.at<double>(0, 0), R.at<double>(1, 0), R.at<double>(2, 0), 0,
+                                R.at<double>(0, 1), R.at<double>(1, 1), R.at<double>(2, 1), 0,
+                                R.at<double>(0, 2), R.at<double>(1, 2), R.at<double>(2, 2), 0,
+                                0,                  0,                  0,                  1 };
+                            auto eulerAngles = Eul_FromHMatrix(H, EulOrdYXZr);
+
+                            parameters->wrotation2 = wrotation2;
+                            parameters->wtranslation2 = wtranslation2;
+                            parameters->calibOffsetX2 = 100 * wtranslation2.at<double>(0, 3);
+                            parameters->calibOffsetY2 = 100 * wtranslation2.at<double>(1, 3);
+                            parameters->calibOffsetZ2 = 100 * wtranslation2.at<double>(2, 3);
+                            parameters->calibOffsetA2 = -(180.0/M_PI) * eulerAngles.z;
+                            parameters->calibOffsetB2 = -(180.0/M_PI) * eulerAngles.x;
+                            parameters->calibOffsetC2 = (180.0/M_PI) * eulerAngles.y;
+                            parameters->Save();
+
+                            calibratorProjected1.clear();
+                            calibratorProjected2.clear();
+                            calibratorReprojected1.clear();
+                            calibratorReprojected2.clear();
+                            calibratorPoints1.clear();
+                            calibratorPoints2.clear();
+                            calibratorTimes1.clear();
+                            calibratorTimes2.clear();
+
+                            pointsThreshold += pointsThresholdIncrement;
+                            pointsThresholdIncrement += 10;
+                        }
                     }
                 }
             }
@@ -2258,44 +2295,80 @@ void Tracker::MainLoop2()
                     cv::Mat rpos = (cv::Mat_<double>(4, 1) << point2[1].x, point2[1].y, point2[1].z, 1);
                     rpos = wtranslation2 * rpos;
 
-                    calibratorPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
-                    calibratorTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+                    cv::Point3d curPoint2;
 
-                    if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
-                    {
-                        cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
-                        wtranslation2 = wtranslation * wtranslation2;
-                        cv::Mat R = (cv::Mat_<double>(3, 3) <<
-                                                 wtranslation2.at<double>(0, 0), wtranslation2.at<double>(0, 1), wtranslation2.at<double>(0, 2),
-                                                 wtranslation2.at<double>(1, 0), wtranslation2.at<double>(1, 1), wtranslation2.at<double>(1, 2),
-                                                 wtranslation2.at<double>(2, 0), wtranslation2.at<double>(2, 1), wtranslation2.at<double>(2, 2));
-                        wrotation2 =  mRot2Quat(R);
-                        HMatrix H = { R.at<double>(0, 0), R.at<double>(1, 0), R.at<double>(2, 0), 0,
-                                      R.at<double>(0, 1), R.at<double>(1, 1), R.at<double>(2, 1), 0,
-                                      R.at<double>(0, 2), R.at<double>(1, 2), R.at<double>(2, 2), 0,
-                                      0,                  0,                  0,                  1 };
-                        auto eulerAngles = Eul_FromHMatrix(H, EulOrdYXZr);
+                    curPoint2.x = rpos.at<double>(0,0);
+                    curPoint2.y = rpos.at<double>(1,0);
+                    curPoint2.z = rpos.at<double>(2,0);
 
-                        parameters->wrotation2 = wrotation2;
-                        parameters->wtranslation2 = wtranslation2;
-                        parameters->calibOffsetX2 = 100 * wtranslation2.at<double>(0, 3);
-                        parameters->calibOffsetY2 = 100 * wtranslation2.at<double>(1, 3);
-                        parameters->calibOffsetZ2 = 100 * wtranslation2.at<double>(2, 3);
-                        parameters->calibOffsetA2 = -(180.0/M_PI) * eulerAngles.z;
-                        parameters->calibOffsetB2 = -(180.0/M_PI) * eulerAngles.x;
-                        parameters->calibOffsetC2 = (180.0/M_PI) * eulerAngles.y;
-                        parameters->Save();
+                    cv::Point3d delta2 = curPoint2 - prevPoint2;
+                    prevPoint2 = curPoint2;
 
-                        calibratorProjected1.clear();
-                        calibratorProjected2.clear();
-                        calibratorReprojected1.clear();
-                        calibratorReprojected2.clear();
-                        calibratorPoints1.clear();
-                        calibratorPoints2.clear();
-                        calibratorTimes1.clear();
-                        calibratorTimes2.clear();
+                    double distance2 = sqrt(delta2.x * delta2.x + delta2.y * delta2.y + delta2.z * delta2.z);
+                    speed2 = speed2 * 0.9 + distance2 * 0.1;
 
-                        pointsThreshold += 1000;
+                    bool startResting = false;
+                    bool stopResting = false;
+
+                    if ((speed2 < 0.003) && (!isResting2)) {
+                        startResting = true;
+                    }
+
+                    if ((speed2 > 0.009) && (isResting2)) {
+                        stopResting = true;
+                    }
+
+                    if (startResting) {
+                        printf("start resting 2\n");
+                        isResting2 = true;
+                    }
+
+                    if (stopResting) {
+                        printf("stop resting 2\n");
+                        isResting2 = false;
+                    }
+
+                    if (isResting1 || isResting2) {
+                        calibratorPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
+                        calibratorTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+
+                        if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
+                        {
+                            cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
+                            wtranslation2 = wtranslation * wtranslation2;
+                            cv::Mat R = (cv::Mat_<double>(3, 3) <<
+                                                     wtranslation2.at<double>(0, 0), wtranslation2.at<double>(0, 1), wtranslation2.at<double>(0, 2),
+                                                     wtranslation2.at<double>(1, 0), wtranslation2.at<double>(1, 1), wtranslation2.at<double>(1, 2),
+                                                     wtranslation2.at<double>(2, 0), wtranslation2.at<double>(2, 1), wtranslation2.at<double>(2, 2));
+                            wrotation2 =  mRot2Quat(R);
+                            HMatrix H = { R.at<double>(0, 0), R.at<double>(1, 0), R.at<double>(2, 0), 0,
+                                          R.at<double>(0, 1), R.at<double>(1, 1), R.at<double>(2, 1), 0,
+                                          R.at<double>(0, 2), R.at<double>(1, 2), R.at<double>(2, 2), 0,
+                                          0,                  0,                  0,                  1 };
+                            auto eulerAngles = Eul_FromHMatrix(H, EulOrdYXZr);
+
+                            parameters->wrotation2 = wrotation2;
+                            parameters->wtranslation2 = wtranslation2;
+                            parameters->calibOffsetX2 = 100 * wtranslation2.at<double>(0, 3);
+                            parameters->calibOffsetY2 = 100 * wtranslation2.at<double>(1, 3);
+                            parameters->calibOffsetZ2 = 100 * wtranslation2.at<double>(2, 3);
+                            parameters->calibOffsetA2 = -(180.0/M_PI) * eulerAngles.z;
+                            parameters->calibOffsetB2 = -(180.0/M_PI) * eulerAngles.x;
+                            parameters->calibOffsetC2 = (180.0/M_PI) * eulerAngles.y;
+                            parameters->Save();
+
+                            calibratorProjected1.clear();
+                            calibratorProjected2.clear();
+                            calibratorReprojected1.clear();
+                            calibratorReprojected2.clear();
+                            calibratorPoints1.clear();
+                            calibratorPoints2.clear();
+                            calibratorTimes1.clear();
+                            calibratorTimes2.clear();
+
+                            pointsThreshold += pointsThresholdIncrement;
+                            pointsThresholdIncrement += 10;
+                        }
                     }
                 }
             }

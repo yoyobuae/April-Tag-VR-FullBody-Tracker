@@ -123,6 +123,14 @@ private:
     std::vector<cv::Point3d> calibratorPoints2;
     std::vector<long> calibratorTimes1;
     std::vector<long> calibratorTimes2;
-    int pointsThreshold = 1000;
-
+    int pointsThreshold = 5;
+    int pointsThresholdIncrement = 1;
+    cv::Point3d prevPoint1 = cv::Point3d(0, 0, 0);
+    cv::Point3d prevPoint2 = cv::Point3d(0, 0, 0);
+    double speed1 = 0.0;
+    double speed2 = 0.0;
+    bool isResting1 = false;
+    bool isResting2 = false;
+    std::vector<cv::Point3d> avgPoints1;
+    std::vector<cv::Point3d> avgPoints2;
 };
