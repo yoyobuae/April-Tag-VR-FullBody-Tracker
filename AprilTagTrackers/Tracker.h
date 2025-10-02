@@ -272,7 +272,7 @@ public:
     Quaternion<double> wrotation = Quaternion<double>(1, 0, 0, 0);
 
     double calibScale = 1;
-    int drawImgSize = 675;
+    int drawImgSize = 1350;
     bool rotate = false;
     int rotateFlag = -1;
 
