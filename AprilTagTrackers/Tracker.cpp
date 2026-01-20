@@ -2143,10 +2143,10 @@ void Tracker::MainLoop()
             if (!trackerStatus[i].doImageMatching)
                 continue;
 
-            int searchLeft   = static_cast<int>(trackerStatus[i].oldCenter.x - 6*trackerStatus[i].searchSize);
-            int searchRight  = static_cast<int>(trackerStatus[i].oldCenter.x + 6*trackerStatus[i].searchSize);
-            int searchTop    = static_cast<int>(trackerStatus[i].oldCenter.y - 6*trackerStatus[i].searchSize);
-            int searchBottom = static_cast<int>(trackerStatus[i].oldCenter.y + 6*trackerStatus[i].searchSize);
+            int searchLeft   = static_cast<int>(trackerStatus[i].oldCenter.x - 4*trackerStatus[i].searchSize);
+            int searchRight  = static_cast<int>(trackerStatus[i].oldCenter.x + 4*trackerStatus[i].searchSize);
+            int searchTop    = static_cast<int>(trackerStatus[i].oldCenter.y - 4*trackerStatus[i].searchSize);
+            int searchBottom = static_cast<int>(trackerStatus[i].oldCenter.y + 4*trackerStatus[i].searchSize);
 
             searchLeft   = (searchLeft   >= frame->cols()) ? (frame->cols() - 1) : ((searchLeft   < 0) ? 0 : searchLeft);
             searchRight  = (searchRight  >= frame->cols()) ? (frame->cols() - 1) : ((searchRight  < 0) ? 0 : searchRight);
