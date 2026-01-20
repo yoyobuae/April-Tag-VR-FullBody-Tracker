@@ -32,13 +32,13 @@ add_dependencies("AprilTagTrackers" "wxbase" "wxcore" "wxnet")
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT AprilTagTrackers)
 #set_target_properties("AprilTagTrackers" PROPERTIES LINK_FLAGS /SUBSYSTEM:WINDOWS )
 
-add_subdirectory("MulticamCalibrator")
-add_dependencies("MulticamCalibrator" "apriltags")
-add_dependencies("MulticamCalibrator" "wxbase" "wxcore" "wxnet")
-
-add_subdirectory("LevelCalibrator")
-add_dependencies("LevelCalibrator" "apriltags")
-add_dependencies("LevelCalibrator" "wxbase" "wxcore" "wxnet")
+# add_subdirectory("MulticamCalibrator")
+# add_dependencies("MulticamCalibrator" "apriltags")
+# add_dependencies("MulticamCalibrator" "wxbase" "wxcore" "wxnet")
+# 
+# add_subdirectory("LevelCalibrator")
+# add_dependencies("LevelCalibrator" "apriltags")
+# add_dependencies("LevelCalibrator" "wxbase" "wxcore" "wxnet")
 
 add_subdirectory("AprilTagRouter")
 
