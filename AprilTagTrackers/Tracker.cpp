@@ -558,12 +558,15 @@ void CameraOCV::CameraLoop()
             cv::line(drawImg, cv::Point(0, img.rows/2), cv::Point(img.cols, img.rows/2), cv::Scalar(0, 0, 255));
             if (tracker->previewCameraCalibration)
             {
+                int drawImgSize = tracker->drawImgSize;
                 cv::Mat *outImg = new cv::Mat();
                 previewCalibration(drawImg, parameters);
                 cv::resize(drawImg, *outImg, cv::Size(cols, rows));
-                gui->CallAfter([outImg] ()
+                gui->CallAfter([outImg, drawImgSize] ()
                                {
+                               cv::namedWindow("Preview", 0);
                                cv::imshow("Preview", *outImg);
+                               cv::resizeWindow("Preview", drawImgSize, drawImgSize);
                                cv::waitKey(1);
                                delete(outImg);
                                });
@@ -571,11 +574,14 @@ void CameraOCV::CameraLoop()
             }
             else
             {
+                int drawImgSize = tracker->drawImgSize;
                 cv::Mat *outImg = new cv::Mat();
                 cv::resize(drawImg, *outImg, cv::Size(cols, rows));
-                gui->CallAfter([outImg] ()
+                gui->CallAfter([outImg, drawImgSize] ()
                                {
+                               cv::namedWindow("Preview", 0);
                                cv::imshow("Preview", *outImg);
+                               cv::resizeWindow("Preview", drawImgSize, drawImgSize);
                                cv::waitKey(1);
                                delete(outImg);
                                });
@@ -780,12 +786,15 @@ void CameraV4L2::CameraLoop()
             cv::line(drawImg, cv::Point(0, drawImg.rows/2), cv::Point(drawImg.cols, drawImg.rows/2), cv::Scalar(0, 0, 255));
             if (tracker->previewCameraCalibration)
             {
+                int drawImgSize = tracker->drawImgSize;
                 cv::Mat *outImg = new cv::Mat();
                 previewCalibration(drawImg, parameters);
                 drawImg.copyTo(*outImg);
-                gui->CallAfter([outImg] ()
+                gui->CallAfter([outImg, drawImgSize] ()
                                {
+                               cv::namedWindow("Preview", 0);
                                cv::imshow("Preview", *outImg);
+                               cv::resizeWindow("Preview", drawImgSize, drawImgSize);
                                cv::waitKey(1);
                                delete(outImg);
                                });
@@ -793,11 +802,14 @@ void CameraV4L2::CameraLoop()
             }
             else
             {
+                int drawImgSize = tracker->drawImgSize;
                 cv::Mat *outImg = new cv::Mat();
                 drawImg.copyTo(*outImg);
-                gui->CallAfter([outImg] ()
+                gui->CallAfter([outImg, drawImgSize] ()
                                {
+                               cv::namedWindow("Preview", 0);
                                cv::imshow("Preview", *outImg);
+                               cv::resizeWindow("Preview", drawImgSize, drawImgSize);
                                cv::waitKey(1);
                                delete(outImg);
                                });
@@ -3296,7 +3308,9 @@ void Tracker::MainLoop()
                            {
                            cv::rotate(*outImg, *outImg, this->rotateFlag);
                            }
+                           cv::namedWindow("out", 0);
                            cv::imshow("out", *outImg);
+                           cv::resizeWindow("out", drawImgSize, drawImgSize);
                            //if (didMatchTemplate) cv::imshow("matchTemplateResult", *outMatchTemplateResult);
                            cv::waitKey(1);
                            delete(outImg);
@@ -3368,9 +3382,11 @@ void Tracker::MainLoop()
             statsCurX = (statsCurX >= 2000) ? 0 : statsCurX;
 
             statsImg.copyTo(*outImg);
-            gui->CallAfter([outImg] ()
+            gui->CallAfter([outImg, this] ()
                            {
+                           cv::namedWindow("stats", 0);
                            cv::imshow("stats", *outImg);
+                           cv::resizeWindow("stats", 2000, 1000);
                            cv::waitKey(1);
                            delete(outImg);
                            });
