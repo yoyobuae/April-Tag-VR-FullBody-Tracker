@@ -2925,7 +2925,7 @@ void Tracker::MainLoop()
 
                 }
             }
-            catch (std::exception&)
+            catch (std::exception& ex)
             {
                 wxString e = parameters->language.TRACKER_DETECTION_SOMETHINGWRONG;
                 gui->CallAfter([e] ()
