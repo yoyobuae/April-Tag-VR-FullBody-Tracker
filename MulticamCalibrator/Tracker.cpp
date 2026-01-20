@@ -1682,50 +1682,83 @@ void Tracker::MainLoop1()
                 trackerStatus[i].maskCenter = projected1[1];
                 if (true) //(frameCount1++ % 5 == 0)
                 {
-                    calibratorProjected1.push_back(projected1[1]);
-                    if (tracker_pose_valid[i] == 0)
-                    {
-                        calibratorReprojected2.push_back(projected2[1]);
-                    }
-
                     cv::Mat rpos = (cv::Mat_<double>(4, 1) << point1[1].x, point1[1].y, point1[1].z, 1);
                     rpos = wtranslation1 * rpos;
 
-                    cv::Point3d curPoint1;
+                    restPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
+                    while (restPoints1.size() > maxRestPoints) restPoints1.pop_front();
 
-                    curPoint1.x = rpos.at<double>(0,0);
-                    curPoint1.y = rpos.at<double>(1,0);
-                    curPoint1.z = rpos.at<double>(2,0);
+                    // Max
+                    cv::Point3d maxRestPoint = restPoints1.front();
+                    for (cv::Point3d p : restPoints1) {
+                        if (maxRestPoint.x < p.x) maxRestPoint.x = p.x;
+                        if (maxRestPoint.y < p.y) maxRestPoint.y = p.y;
+                        if (maxRestPoint.z < p.z) maxRestPoint.z = p.z;
+                    }
 
-                    cv::Point3d delta1 = curPoint1 - prevPoint1;
-                    prevPoint1 = curPoint1;
+                    // Min
+                    cv::Point3d minRestPoint = restPoints1.front();
+                    for (cv::Point3d p : restPoints1) {
+                        if (minRestPoint.x > p.x) minRestPoint.x = p.x;
+                        if (minRestPoint.y > p.y) minRestPoint.y = p.y;
+                        if (minRestPoint.z > p.z) minRestPoint.z = p.z;
+                    }
 
-                    double distance1 = sqrt(delta1.x * delta1.x + delta1.y * delta1.y + delta1.z * delta1.z);
-                    speed1 = speed1 * 0.9 + distance1 * 0.1;
+                    // Diff
+                    cv::Point3d diffRestPoint = cv::Point3d(maxRestPoint.x - minRestPoint.x,
+                                                            maxRestPoint.y - minRestPoint.y,
+                                                            maxRestPoint.z - minRestPoint.z);
+#if 0
+                    if (frameCount1++ % 30 == 0)
+                    {
+                        printf("maxRestPoint1: %3.2f, %3.2f, %3.2f\n",
+                               maxRestPoint.x, maxRestPoint.y, maxRestPoint.z);
+                        printf("minRestPoint1: %3.2f, %3.2f, %3.2f\n",
+                               minRestPoint.x, minRestPoint.y, minRestPoint.z);
+                        printf("diffRestPoint1: %3.2f, %3.2f, %3.2f\n",
+                               diffRestPoint.x, diffRestPoint.y, diffRestPoint.z);
+                    }
+#endif
 
                     bool startResting = false;
                     bool stopResting = false;
 
-                    if ((speed1 < 0.003) && (!isResting1)) {
+                    if ((diffRestPoint.x < 0.02 &&
+                         diffRestPoint.y < 0.02 &&
+                         diffRestPoint.z < 0.02) &&
+                        (!isResting1))
+                    {
                         startResting = true;
                     }
 
-                    if ((speed1 > 0.009) && (isResting1)) {
+                    if ((diffRestPoint.x > 0.05 ||
+                         diffRestPoint.y > 0.05 ||
+                         diffRestPoint.z > 0.05) &&
+                        (isResting1))
+                    {
                         stopResting = true;
                     }
 
-                    if (startResting) {
+                    if (startResting)
+                    {
                         printf("start resting 1\n");
                         isResting1 = true;
-                        avgPoints1.push_back(curPoint1);
                     }
 
-                    if (stopResting) {
+                    if (stopResting)
+                    {
                         printf("stop resting 1\n");
                         isResting1 = false;
                     }
 
-                    if (isResting1 || isResting2) {
+                    if (isResting1 || isResting2)
+                    {
+                        calibratorProjected1.push_back(projected1[1]);
+                        if (tracker_pose_valid[i] == 0)
+                        {
+                            calibratorReprojected2.push_back(projected2[1]);
+                        }
+
                         calibratorPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                         calibratorTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
@@ -1767,6 +1800,7 @@ void Tracker::MainLoop1()
                             pointsThresholdIncrement += 10;
                         }
                     }
+
                 }
             }
 
@@ -2286,49 +2320,83 @@ void Tracker::MainLoop2()
                 trackerStatus[i].maskCenter = projected2[1];
                 if (true) //(frameCount1++ % 5 == 0)
                 {
-                    calibratorProjected2.push_back(projected2[1]);
-                    if (tracker_pose_valid[i] == 0)
-                    {
-                        calibratorReprojected1.push_back(projected1[1]);
-                    }
-
                     cv::Mat rpos = (cv::Mat_<double>(4, 1) << point2[1].x, point2[1].y, point2[1].z, 1);
                     rpos = wtranslation2 * rpos;
 
-                    cv::Point3d curPoint2;
+                    restPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
+                    while (restPoints2.size() > maxRestPoints) restPoints2.pop_front();
 
-                    curPoint2.x = rpos.at<double>(0,0);
-                    curPoint2.y = rpos.at<double>(1,0);
-                    curPoint2.z = rpos.at<double>(2,0);
+                    // Max
+                    cv::Point3d maxRestPoint = restPoints2.front();
+                    for (cv::Point3d p : restPoints2) {
+                        if (maxRestPoint.x < p.x) maxRestPoint.x = p.x;
+                        if (maxRestPoint.y < p.y) maxRestPoint.y = p.y;
+                        if (maxRestPoint.z < p.z) maxRestPoint.z = p.z;
+                    }
 
-                    cv::Point3d delta2 = curPoint2 - prevPoint2;
-                    prevPoint2 = curPoint2;
+                    // Min
+                    cv::Point3d minRestPoint = restPoints2.front();
+                    for (cv::Point3d p : restPoints2) {
+                        if (minRestPoint.x > p.x) minRestPoint.x = p.x;
+                        if (minRestPoint.y > p.y) minRestPoint.y = p.y;
+                        if (minRestPoint.z > p.z) minRestPoint.z = p.z;
+                    }
 
-                    double distance2 = sqrt(delta2.x * delta2.x + delta2.y * delta2.y + delta2.z * delta2.z);
-                    speed2 = speed2 * 0.9 + distance2 * 0.1;
+                    // Diff
+                    cv::Point3d diffRestPoint = cv::Point3d(maxRestPoint.x - minRestPoint.x,
+                                                            maxRestPoint.y - minRestPoint.y,
+                                                            maxRestPoint.z - minRestPoint.z);
+#if 0
+                    if (frameCount2++ % 30 == 0)
+                    {
+                        printf("maxRestPoint2: %3.2f, %3.2f, %3.2f\n",
+                               maxRestPoint.x, maxRestPoint.y, maxRestPoint.z);
+                        printf("minRestPoint2: %3.2f, %3.2f, %3.2f\n",
+                               minRestPoint.x, minRestPoint.y, minRestPoint.z);
+                        printf("diffRestPoint2: %3.2f, %3.2f, %3.2f\n",
+                               diffRestPoint.x, diffRestPoint.y, diffRestPoint.z);
+                    }
+#endif
 
                     bool startResting = false;
                     bool stopResting = false;
 
-                    if ((speed2 < 0.003) && (!isResting2)) {
+                    if ((diffRestPoint.x < 0.02 &&
+                         diffRestPoint.y < 0.02 &&
+                         diffRestPoint.z < 0.02) &&
+                        (!isResting2))
+                    {
                         startResting = true;
                     }
 
-                    if ((speed2 > 0.009) && (isResting2)) {
+                    if ((diffRestPoint.x > 0.05 ||
+                         diffRestPoint.y > 0.05 ||
+                         diffRestPoint.z > 0.05) &&
+                        (isResting2))
+                    {
                         stopResting = true;
                     }
 
-                    if (startResting) {
+                    if (startResting)
+                    {
                         printf("start resting 2\n");
                         isResting2 = true;
                     }
 
-                    if (stopResting) {
+                    if (stopResting)
+                    {
                         printf("stop resting 2\n");
                         isResting2 = false;
                     }
 
-                    if (isResting1 || isResting2) {
+                    if (isResting1 || isResting2)
+                    {
+                        calibratorProjected2.push_back(projected2[1]);
+                        if (tracker_pose_valid[i] == 0)
+                        {
+                            calibratorReprojected1.push_back(projected1[1]);
+                        }
+
                         calibratorPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
                         calibratorTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 

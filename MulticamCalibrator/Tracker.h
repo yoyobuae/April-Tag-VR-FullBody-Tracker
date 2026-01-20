@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <list>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -79,7 +80,7 @@ private:
     void MainLoop1();
     void MainLoop2();
 
-    int drawImgSize = 1385;
+    int drawImgSize = 1200;
 
     cv::VideoCapture cap1;
     cv::VideoCapture cap2;
@@ -123,14 +124,12 @@ private:
     std::vector<cv::Point3d> calibratorPoints2;
     std::vector<long> calibratorTimes1;
     std::vector<long> calibratorTimes2;
-    int pointsThreshold = 5;
+    int pointsThreshold = 30;
     int pointsThresholdIncrement = 1;
-    cv::Point3d prevPoint1 = cv::Point3d(0, 0, 0);
     cv::Point3d prevPoint2 = cv::Point3d(0, 0, 0);
-    double speed1 = 0.0;
-    double speed2 = 0.0;
+    const int maxRestPoints = 15;
     bool isResting1 = false;
     bool isResting2 = false;
-    std::vector<cv::Point3d> avgPoints1;
-    std::vector<cv::Point3d> avgPoints2;
+    std::list<cv::Point3d> restPoints1;
+    std::list<cv::Point3d> restPoints2;
 };
