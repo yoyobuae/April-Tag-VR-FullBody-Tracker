@@ -214,6 +214,8 @@ void FrameDataOCV::getImage(cv::Mat& out,
             out = src;
         }
     }
+
+    return true;
 }
 
 cv::Size FrameDataOCV::size() const
@@ -242,19 +244,37 @@ void FrameDataV4L2::swap(std::unique_ptr<V4L2Wrapper::Buffer> &other)
 {
     buf.swap(other);
 
-    if (buf)
-    {
+    do {
+        if (!buf)
+        {
+            width = 0;
+            height = 0;
+            break;
+        }
+
         JPEGWrapper::Decompress jpegDecompress;
 
         jpegDecompress.setMemSource(static_cast<unsigned char *>(buf->Data()), buf->Size());
+
+        if (jpegDecompress.status() == JPEGWrapper::Error)
+        {
+            width = 0;
+            height = 0;
+            break;
+        }
+
         jpegDecompress.readHeader(true);
+
+        if (jpegDecompress.status() == JPEGWrapper::Error)
+        {
+            width = 0;
+            height = 0;
+            break;
+        }
 
         width = jpegDecompress.inputWidth();
         height = jpegDecompress.inputHeight();
-    } else {
-        width = 0;
-        height = 0;
-    }
+    } while(false);
 }
 
 void FrameDataV4L2::swap(FrameData& other)
@@ -269,16 +289,27 @@ void FrameDataV4L2::swap(FrameData& other)
     }
 }
 
-void FrameDataV4L2::getImage(cv::Mat& out,
+bool FrameDataV4L2::getImage(cv::Mat& out,
                             bool grayscale,
                             bool scale, int scale_num, int scale_denom,
                             bool useRoi, const cv::Rect& roi)
 {
-    if (buf) {
+    do {
+        if (!buf)
+            return false;
+
         JPEGWrapper::Decompress jpegDecompress;
 
         jpegDecompress.setMemSource(static_cast<unsigned char *>(buf->Data()), buf->Size());
+
+        if (jpegDecompress.status() == JPEGWrapper::Error)
+            return false;
+
         jpegDecompress.readHeader(true);
+
+        if (jpegDecompress.status() == JPEGWrapper::Error)
+            return false;
+
         jpegDecompress.setColorspace(grayscale ? JCS_GRAYSCALE : JCS_EXT_BGR);
         jpegDecompress.setDCTMethod(JDCT_IFAST);
         jpegDecompress.setDoFancyUpsampling(false);
@@ -291,8 +322,15 @@ void FrameDataV4L2::getImage(cv::Mat& out,
 
         jpegDecompress.start();
 
+        if (jpegDecompress.status() == JPEGWrapper::Error)
+            return false;
+
         if (useRoi)
             jpegDecompress.setCrop(roi.x, roi.y, roi.width, roi.height);
+
+
+        if (jpegDecompress.status() == JPEGWrapper::Error)
+            return false;
 
         cv::Mat tmp;
         tmp.create(jpegDecompress.outputHeight(),
@@ -300,6 +338,9 @@ void FrameDataV4L2::getImage(cv::Mat& out,
                    grayscale ? CV_8UC1 : CV_8UC3);
 
         jpegDecompress.read(tmp.ptr(), tmp.total() * tmp.elemSize());
+
+        if (jpegDecompress.status() == JPEGWrapper::Error)
+            return false;
 
         /* JPEGWrapper might adjust the ROI position and size a little bit
          * in order to perform the decoding. Here we adjust back the ROI to avoid
@@ -318,7 +359,9 @@ void FrameDataV4L2::getImage(cv::Mat& out,
         }
 
         jpegDecompress.stop();
-    }
+    } while(false);
+
+    return true;
 }
 
 cv::Size FrameDataV4L2::size() const
@@ -776,46 +819,49 @@ void CameraV4L2::CameraLoop()
                     break;
                 }
             }
-            frame.getImage(drawImg,
-                           false,
-                           true, 1, scale_denom,
-                           false, cv::Rect());
-            cv::putText(drawImg, std::to_string((int)(fps + (0.5))), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
-            cv::putText(drawImg, resolution, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
-            cv::line(drawImg, cv::Point(drawImg.cols/2, 0), cv::Point(drawImg.cols/2, drawImg.rows), cv::Scalar(0, 0, 255));
-            cv::line(drawImg, cv::Point(0, drawImg.rows/2), cv::Point(drawImg.cols, drawImg.rows/2), cv::Scalar(0, 0, 255));
-            if (tracker->previewCameraCalibration)
+            bool res = frame.getImage(drawImg,
+                                      false,
+                                      true, 1, scale_denom,
+                                      false, cv::Rect());
+            if (res)
             {
-                int drawImgSize = tracker->drawImgSize;
-                cv::Mat *outImg = new cv::Mat();
-                previewCalibration(drawImg, parameters);
-                drawImg.copyTo(*outImg);
-                gui->CallAfter([outImg, drawImgSize] ()
-                               {
-                               cv::namedWindow("Preview", 0);
-                               cv::imshow("Preview", *outImg);
-                               cv::resizeWindow("Preview", drawImgSize, drawImgSize);
-                               cv::waitKey(1);
-                               delete(outImg);
-                               });
-                previewShown = true;
+                cv::putText(drawImg, std::to_string((int)(fps + (0.5))), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
+                cv::putText(drawImg, resolution, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
+                cv::line(drawImg, cv::Point(drawImg.cols/2, 0), cv::Point(drawImg.cols/2, drawImg.rows), cv::Scalar(0, 0, 255));
+                cv::line(drawImg, cv::Point(0, drawImg.rows/2), cv::Point(drawImg.cols, drawImg.rows/2), cv::Scalar(0, 0, 255));
+                if (tracker->previewCameraCalibration)
+                {
+                    int drawImgSize = tracker->drawImgSize;
+                    cv::Mat *outImg = new cv::Mat();
+                    previewCalibration(drawImg, parameters);
+                    drawImg.copyTo(*outImg);
+                    gui->CallAfter([outImg, drawImgSize] ()
+                                   {
+                                   cv::namedWindow("Preview", 0);
+                                   cv::imshow("Preview", *outImg);
+                                   cv::resizeWindow("Preview", drawImgSize, drawImgSize);
+                                   cv::waitKey(1);
+                                   delete(outImg);
+                                   });
+                    previewShown = true;
+                }
+                else
+                {
+                    int drawImgSize = tracker->drawImgSize;
+                    cv::Mat *outImg = new cv::Mat();
+                    drawImg.copyTo(*outImg);
+                    gui->CallAfter([outImg, drawImgSize] ()
+                                   {
+                                   cv::namedWindow("Preview", 0);
+                                   cv::imshow("Preview", *outImg);
+                                   cv::resizeWindow("Preview", drawImgSize, drawImgSize);
+                                   cv::waitKey(1);
+                                   delete(outImg);
+                                   });
+                    previewShown = true;
+                }
+                frame_visible = true;
             }
-            else
-            {
-                int drawImgSize = tracker->drawImgSize;
-                cv::Mat *outImg = new cv::Mat();
-                drawImg.copyTo(*outImg);
-                gui->CallAfter([outImg, drawImgSize] ()
-                               {
-                               cv::namedWindow("Preview", 0);
-                               cv::imshow("Preview", *outImg);
-                               cv::resizeWindow("Preview", drawImgSize, drawImgSize);
-                               cv::waitKey(1);
-                               delete(outImg);
-                               });
-                previewShown = true;
-            }
-            frame_visible = true;
         }
         else if (previewShown) 
         {
@@ -1010,10 +1056,13 @@ void Tracker::CalibrateCameraCharuco()
     while(mainThreadRunning && camera->isRunning())
     {
         camera->CopyFreshImageTo(*frame);
-        frame->getImage(image,
-                        false,
-                        false, 1, 1,
-                        false, cv::Rect());
+        bool res = frame->getImage(image,
+                            false,
+                            false, 1, 1,
+                            false, cv::Rect());
+        if (!res)
+            continue;
+
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -1277,10 +1326,14 @@ void Tracker::CalibrateCamera()
             return;
         }
         camera->CopyFreshImageTo(*frame);
-        frame->getImage(image,
-                        false,
-                        false, 1, 1,
-                        false, cv::Rect());
+        bool res = frame->getImage(image,
+                            false,
+                            false, 1, 1,
+                            false, cv::Rect());
+
+        if (!res)
+            continue;
+
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -1501,10 +1554,14 @@ void Tracker::CalibrateTracker()
     while (camera->isRunning() && mainThreadRunning)
     {
         camera->CopyFreshImageTo(*frame);
-        frame->getImage(image,
-                        false,
-                        false, 1, 1,
-                        false, cv::Rect());
+        bool res = frame->getImage(image,
+                            false,
+                            false, 1, 1,
+                            false, cv::Rect());
+
+        if (!res)
+            continue;
+
         if (rotate)
         {
             cv::rotate(image, image, rotateFlag);
@@ -1952,11 +2009,13 @@ void Tracker::MainLoop()
         //                 true,
         //                 false, 1, 1,
         //                 false, cv::Rect());
-        frame->getImage(searchGray,
-                        true,
-                        true, 1, 8,
-                        false, cv::Rect());
+        bool res = frame->getImage(searchGray,
+                            true,
+                            true, 1, 8,
+                            false, cv::Rect());
 
+        if (!res)
+            continue;
 
         frame->toGrayTime = clock();
 
@@ -2479,6 +2538,7 @@ void Tracker::MainLoop()
         double detector_apriltag = 0.0;
         double detector_post_apriltag = 0.0;
 
+        bool scanImageValid = false;
         cv::Rect scanRoi;
         cv::Mat scanImage;
 
@@ -2556,10 +2616,12 @@ void Tracker::MainLoop()
                         {
                             cv::Mat detectGray;
                             detector_mid0 = clock();
-                            frame->getImage(detectGray,
-                                            true,
-                                            false, 1, 1,
-                                            true, roi);
+                            bool res = frame->getImage(detectGray,
+                                                true,
+                                                false, 1, 1,
+                                                true, roi);
+                            if (!res)
+                                continue;
                             detector_mid1 = clock();
                             drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
                             trackerStatus[i].maskedRois[j] = roi;
@@ -2573,6 +2635,7 @@ void Tracker::MainLoop()
                 }
             }
         }
+        scanImageValid = false;
         if (!(doMasking && circularWindow))
         {
             double detector_start = clock();
@@ -2593,20 +2656,24 @@ void Tracker::MainLoop()
 
             cv::Mat detectGray;
             detector_mid0 = clock();
-            frame->getImage(detectGray,
-                            true,
-                            false, 1, 1,
-                            true, roi);
-            detector_mid1 = clock();
+            bool res = frame->getImage(detectGray,
+                                true,
+                                false, 1, 1,
+                                true, roi);
+            if (res)
+            {
+                detector_mid1 = clock();
 
-            scanRoi = roi;
-            scanImage = detectGray;
+                scanRoi = roi;
+                scanImage = detectGray;
+                scanImageValid = true;
 
-            quadrant = (quadrant + 1) % 16;
-            detector_end = clock();
-            detector_pre_jpeg += detector_mid0 - detector_start;
-            detector_jpeg += detector_mid1 - detector_mid0;
-            detector_post_jpeg += detector_end - detector_mid1;
+                quadrant = (quadrant + 1) % 16;
+                detector_end = clock();
+                detector_pre_jpeg += detector_mid0 - detector_start;
+                detector_jpeg += detector_mid1 - detector_mid0;
+                detector_post_jpeg += detector_end - detector_mid1;
+            }
         }
 
         // Run the apriltag detector

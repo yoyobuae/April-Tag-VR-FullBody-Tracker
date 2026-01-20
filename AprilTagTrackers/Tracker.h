@@ -125,7 +125,7 @@ public:
     virtual ~FrameData() { }
 
     virtual void swap(FrameData& other) = 0;
-    virtual void getImage(cv::Mat& out,
+    virtual bool getImage(cv::Mat& out,
                           bool grayscale,
                           bool scale, int scale_num, int scale_denom,
                           bool useRoi, const cv::Rect& roi) = 0;
@@ -144,7 +144,7 @@ public:
     int flags() const;
 
     virtual void swap(FrameData& other) override;
-    virtual void getImage(cv::Mat &out,
+    virtual bool getImage(cv::Mat &out,
                           bool grayscale,
                           bool scale, int scale_num, int scale_denom,
                           bool useRoi, const cv::Rect& roi) override;
@@ -165,7 +165,7 @@ public:
     void swap(std::unique_ptr<V4L2Wrapper::Buffer> &other);
 
     virtual void swap(FrameData& other) override;
-    virtual void getImage(cv::Mat &out,
+    virtual bool getImage(cv::Mat &out,
                           bool grayscale,
                           bool scale, int scale_num, int scale_denom,
                           bool useRoi, const cv::Rect& roi) override;

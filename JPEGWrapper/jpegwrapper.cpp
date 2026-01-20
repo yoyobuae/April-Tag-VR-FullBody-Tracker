@@ -2,28 +2,62 @@
 #include <string>
 #include <vector>
 
+#include <setjmp.h>
+
 #include "jpeglib.h"
 
 #include "jpegwrapper.hpp"
 
 namespace JPEGWrapper {
+    struct custom_error_mgr_s {
+        struct jpeg_error_mgr jerr;
+        jmp_buf setjmp_buffer;
+        Status status;
+    };
+    typedef struct custom_error_mgr_s * custom_error_mgr_ptr;
+
+    static void custom_error_exit(j_common_ptr cinfo)
+    {
+        custom_error_mgr_ptr err_mgr = (custom_error_mgr_ptr)cinfo->err;
+
+        (*cinfo->err->output_message) (cinfo);
+        longjmp(err_mgr->setjmp_buffer, 1);
+    }
 
     Decompress::Decompress()
-        : jerr()
-        , cinfo_()
+        :  cinfo_()
         , shouldCrop(false)
         , first_scanline(0)
         , last_scanline(0)
         , x_offset(0)
         , x_width(0)
+        , err_mgr(new custom_error_mgr)
     {
-        cinfo_.err = jpeg_std_error(&jerr);
-        jpeg_create_decompress(&cinfo_);
+        err_mgr->status = Ok;
+        cinfo_.err = jpeg_std_error(&(err_mgr->jerr));
+        err_mgr->jerr.error_exit = custom_error_exit;
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error creating decompress object
+            err_mgr->status = Error;
+        }
+        else
+        {
+            jpeg_create_decompress(&cinfo_);
+        }
     }
 
     Decompress::~Decompress()
     {
-        jpeg_destroy_decompress(&cinfo_);
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error destroying decompress object
+            err_mgr->status = Error;
+        }
+        else
+        {
+            jpeg_destroy_decompress(&cinfo_);
+        }
     }
 
     const struct jpeg_decompress_struct& Decompress::cinfo() const
@@ -31,14 +65,36 @@ namespace JPEGWrapper {
         return cinfo_;
     }
 
+    Status Decompress::status() const
+    {
+        return err_mgr->status;
+    }
+
     void Decompress::setMemSource(const unsigned char *inbuffer, unsigned long insize)
     {
-        jpeg_mem_src(&cinfo_, inbuffer, insize);
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error setting mem source
+            err_mgr->status = Error;
+        }
+        else
+        {
+            jpeg_mem_src(&cinfo_, inbuffer, insize);
+        }
     }
 
     int Decompress::readHeader(bool require_image)
     {
-        return jpeg_read_header(&cinfo_, require_image);
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error reading header
+            err_mgr->status = Error;
+            return -1;
+        }
+        else
+        {
+            return jpeg_read_header(&cinfo_, require_image);
+        }
     }
 
     void Decompress::setColorspace(J_COLOR_SPACE value)
@@ -69,19 +125,35 @@ namespace JPEGWrapper {
 
     void Decompress::start()
     {
-        jpeg_start_decompress(&cinfo_);
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error starting decompress
+            err_mgr->status = Error;
+        }
+        else
+        {
+            jpeg_start_decompress(&cinfo_);
+        }
     }
 
     void Decompress::setCrop(unsigned int left, unsigned int top,
                              unsigned int width, unsigned int height)
     {
-        shouldCrop = true;
-        first_scanline = top;
-        last_scanline = top + height;
-        x_offset = left;
-        x_width = width;
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error setting crop
+            err_mgr->status = Error;
+        }
+        else
+        {
+            shouldCrop = true;
+            first_scanline = top;
+            last_scanline = top + height;
+            x_offset = left;
+            x_width = width;
 
-        jpeg_crop_scanline(&cinfo_, &x_offset, &x_width);
+            jpeg_crop_scanline(&cinfo_, &x_offset, &x_width);
+        }
     }
 
     unsigned long int Decompress::getOutputBufferSize()
@@ -92,44 +164,61 @@ namespace JPEGWrapper {
 
     void Decompress::read(unsigned char *outbuffer, unsigned long int outsize)
     {
-        int row_stride = cinfo_.output_width * cinfo_.out_color_components;
-        int required_outsize = row_stride * outputHeight();
-
-        if (required_outsize > outsize) {
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error setting mem source
+            err_mgr->status = Error;
             return;
-        }
-
-        if (shouldCrop) {
-            jpeg_skip_scanlines(&cinfo_, first_scanline);
         }
         else
         {
-            last_scanline = cinfo_.output_height;
-        }
+            int row_stride = cinfo_.output_width * cinfo_.out_color_components;
+            int required_outsize = row_stride * outputHeight();
 
-        std::vector<JSAMPROW> row_pointer;
-        row_pointer.resize(cinfo_.rec_outbuf_height);
-
-        while (cinfo_.output_scanline < last_scanline) {
-            for (int i = 0; i < cinfo_.rec_outbuf_height; i++) {
-                row_pointer[i] = outbuffer + row_stride * (i + cinfo_.output_scanline - first_scanline);
+            if (required_outsize > outsize) {
+                return;
             }
-            jpeg_read_scanlines(&cinfo_, row_pointer.data(), cinfo_.rec_outbuf_height);
-        }
 
-        if (shouldCrop) {
-            jpeg_skip_scanlines(&cinfo_, cinfo_.output_height - cinfo_.output_scanline);
+            if (shouldCrop) {
+                jpeg_skip_scanlines(&cinfo_, first_scanline);
+            }
+            else
+            {
+                last_scanline = cinfo_.output_height;
+            }
+
+            std::vector<JSAMPROW> row_pointer;
+            row_pointer.resize(cinfo_.rec_outbuf_height);
+
+            while (cinfo_.output_scanline < last_scanline) {
+                for (int i = 0; i < cinfo_.rec_outbuf_height; i++) {
+                    row_pointer[i] = outbuffer + row_stride * (i + cinfo_.output_scanline - first_scanline);
+                }
+                jpeg_read_scanlines(&cinfo_, row_pointer.data(), cinfo_.rec_outbuf_height);
+            }
+
+            if (shouldCrop) {
+                jpeg_skip_scanlines(&cinfo_, cinfo_.output_height - cinfo_.output_scanline);
+            }
         }
     }
 
     void Decompress::stop()
     {
-        jpeg_finish_decompress(&cinfo_);
-        shouldCrop = false;
-        first_scanline = 0;
-        last_scanline = 0;
-        x_offset = 0;
-        x_width = 0;
+        if (setjmp(err_mgr->setjmp_buffer))
+        {
+            // error setting mem source
+            err_mgr->status = Error;
+        }
+        else
+        {
+            jpeg_finish_decompress(&cinfo_);
+            shouldCrop = false;
+            first_scanline = 0;
+            last_scanline = 0;
+            x_offset = 0;
+            x_width = 0;
+        }
     }
 
     JDIMENSION Decompress::inputWidth() const
