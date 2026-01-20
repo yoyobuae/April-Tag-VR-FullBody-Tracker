@@ -2749,7 +2749,7 @@ void Tracker::MainLoop()
                 }
             }
         }
-        if (!(doMasking && circularWindow))
+        if (!(doMasking && circularWindow && scanImageValid))
         {
             double detector_start = clock();
             double detector_mid0 = detector_start;
