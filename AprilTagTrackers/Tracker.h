@@ -112,6 +112,7 @@ public:
     clock_t toGrayTime;
     clock_t getPoseTime;
     clock_t processPoseTime;
+    clock_t templateMatchTime;
     clock_t doMaskTime;
     clock_t preJpegTime;
     clock_t jpegTime;

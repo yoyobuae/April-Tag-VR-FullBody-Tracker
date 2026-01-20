@@ -2318,6 +2318,8 @@ void Tracker::MainLoop()
             }
         }
 
+        frame->templateMatchTime = clock();
+
         //Then define your mask image
 #if 0
         cv::Mat mask = cv::Mat::zeros(gray.size(), gray.type());
@@ -3413,6 +3415,7 @@ void Tracker::MainLoop()
             int getPoseMsecs = int(10000.0 * double(frame->getPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
             int toGrayMsecs = int(10000.0 * double(frame->toGrayTime - frame->captureTime) / double(CLOCKS_PER_SEC));
             int processPoseMsecs = int(10000.0 * double(frame->processPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int templMatchMsecs = int(10000.0 * double(frame->templateMatchTime - frame->captureTime) / double(CLOCKS_PER_SEC));
             int doMaskMsecs = int(10000.0 * double(frame->doMaskTime - frame->captureTime) / double(CLOCKS_PER_SEC));
             int preJpegMsecs = int(10000.0 * double(frame->preJpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
             int jpegMsecs = int(10000.0 * double(frame->jpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
@@ -3424,12 +3427,13 @@ void Tracker::MainLoop()
             int sendTrackerMsecs = int(10000.0 * double(frame->sendTrackerTime - frame->captureTime) / double(CLOCKS_PER_SEC));
 
             rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows),                     colors["black"], -1);                        // Clear
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs),   colors["red"], -1);
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs),    colors["yellow"], -1);
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs),      colors["navy"], -1);
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs),       colors["green"], -1);
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs),  colors["purple"], -1);
-            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs),       colors["cyan"], -1);
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs),   colors["ultramarine"], -1);
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameWriteMsecs),  cv::Point(statsCurX + 2, statsImg.rows - frameReadMsecs),    colors["red"], -1);
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - frameReadMsecs),   cv::Point(statsCurX + 2, statsImg.rows - getPoseMsecs),      colors["yellow"], -1);
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - getPoseMsecs),     cv::Point(statsCurX + 2, statsImg.rows - toGrayMsecs),       colors["navy"], -1);
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - toGrayMsecs),      cv::Point(statsCurX + 2, statsImg.rows - processPoseMsecs),  colors["green"], -1);
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - processPoseMsecs), cv::Point(statsCurX + 2, statsImg.rows - templMatchMsecs),   colors["purple"], -1);
+            rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - templMatchMsecs),  cv::Point(statsCurX + 2, statsImg.rows - doMaskMsecs),       colors["cyan"], -1);
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - doMaskMsecs),      cv::Point(statsCurX + 2, statsImg.rows - preJpegMsecs),      colors["brown"], -1);
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - preJpegMsecs),     cv::Point(statsCurX + 2, statsImg.rows - jpegMsecs),         colors["magenta"], -1);
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - jpegMsecs),        cv::Point(statsCurX + 2, statsImg.rows - postJpegMsecs),     colors["blue"], -1);
