@@ -68,6 +68,9 @@ void AprilTagWrapper::detectMarkers(
     std::vector<cv::Point2f>* centers,
     std::vector<cv::Ptr<cv::aruco::Board>> trackers)
 {
+    if (image.cols == 0 || image.rows == 0)
+        return;
+
     cv::Mat gray;
     if (image.type() != CV_8U)
     {
