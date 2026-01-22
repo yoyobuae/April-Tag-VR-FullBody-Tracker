@@ -1,10 +1,11 @@
 #include <iostream>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <random>
 #include <sstream>
-#include <vector>
 #include <typeinfo>
+#include <vector>
 
 #pragma warning(push)
 #pragma warning(disable:4996)
@@ -188,12 +189,33 @@ void FrameDataOCV::swap(FrameData& other)
 void FrameDataOCV::getImage(cv::Mat& out,
                             bool grayscale,
                             bool scale, int scale_num, int scale_denom,
-                            bool useRoi, const cv::Rect& roi)
+                            bool useRois, std::vector<cv::Rect>& rois)
 {
     cv::Mat src;
 
-    if (useRoi) {
-        src = cv::Mat(image, roi);
+    if (useRois) {
+        int left = std::numeric_limits<int>::max();
+        int top = std::numeric_limits<int>::max();
+        int right = 0;
+        int bottom = 0;
+
+        for (auto roi : rois)
+        {
+            if (left > roi.x) left = roi.x;
+            if (top > roi.y) top = roi.y;
+            if (right < (roi.x + roi.width)) right = roi.x + roi.width;
+            if (bottom < (roi.y + roi.height)) bottom = roi.y + roi.height;
+        }
+
+        for (auto &roi : rois)
+        {
+            roi.x -= left;
+            roi.y -= top;
+        }
+
+        cv::Rect jointRoi(cv::Point(left, top), cv::Point(right, bottom));
+
+        src = cv::Mat(image, jointRoi);
     } else {
         src = image;
     }
@@ -201,6 +223,15 @@ void FrameDataOCV::getImage(cv::Mat& out,
         if (scale) {
             cv::Mat resized;
             double scale = (double)scale_num/(double)scale_denom;
+            if (useRois) {
+                for (auto &roi : rois)
+                {
+                    roi.x = ((long long)roi.x * scale_num)/scale_denom;
+                    roi.y = ((long long)roi.y * scale_num)/scale_denom;
+                    roi.width = ((long long)roi.width * scale_num)/scale_denom;
+                    roi.height = ((long long)roi.height * scale_num)/scale_denom;
+                }
+            }
             cv::resize(src, resized, cv::Size(), scale, scale, cv::INTER_NEAREST);
             cvtColor(resized, out, cv::COLOR_BGR2GRAY);
         } else {
@@ -209,6 +240,15 @@ void FrameDataOCV::getImage(cv::Mat& out,
     } else {
         if (scale) {
             double scale = (double)scale_num/(double)scale_denom;
+            if (useRois) {
+                for (auto &roi : rois)
+                {
+                    roi.x = ((long long)roi.x * scale_num)/scale_denom;
+                    roi.y = ((long long)roi.y * scale_num)/scale_denom;
+                    roi.width = ((long long)roi.width * scale_num)/scale_denom;
+                    roi.height = ((long long)roi.height * scale_num)/scale_denom;
+                }
+            }
             cv::resize(out, src, cv::Size(), scale, scale, cv::INTER_NEAREST);
         } else {
             out = src;
@@ -292,7 +332,7 @@ void FrameDataV4L2::swap(FrameData& other)
 bool FrameDataV4L2::getImage(cv::Mat& out,
                             bool grayscale,
                             bool scale, int scale_num, int scale_denom,
-                            bool useRoi, const cv::Rect& roi)
+                            bool useRois, std::vector<cv::Rect>& rois)
 {
     do {
         if (!buf)
@@ -325,8 +365,13 @@ bool FrameDataV4L2::getImage(cv::Mat& out,
         if (jpegDecompress.status() == JPEGWrapper::Error)
             return false;
 
-        if (useRoi)
-            jpegDecompress.setCrop(roi.x, roi.y, roi.width, roi.height);
+        if (useRois)
+        {
+            for (auto roi : rois)
+                jpegDecompress.addCrop(roi.x, roi.y, roi.width, roi.height);
+
+            jpegDecompress.finishCrop();
+        }
 
 
         if (jpegDecompress.status() == JPEGWrapper::Error)
@@ -342,21 +387,23 @@ bool FrameDataV4L2::getImage(cv::Mat& out,
         if (jpegDecompress.status() == JPEGWrapper::Error)
             return false;
 
-        /* JPEGWrapper might adjust the ROI position and size a little bit
-         * in order to perform the decoding. Here we adjust back the ROI to avoid
-         * unwanted offsets */
-        int adjust_x = roi.x - jpegDecompress.outputLeft();
-        int adjust_y = roi.y - jpegDecompress.outputTop();
-        if ((useRoi) &&
-            (adjust_x >= 0) && (adjust_y >= 0) &&
-            (adjust_x < jpegDecompress.outputLeft()) &&
-            (adjust_y < jpegDecompress.outputTop())) {
-            out = cv::Mat(tmp, cv::Rect(adjust_x, adjust_y,
-                                        jpegDecompress.outputWidth() - adjust_x,
-                                        jpegDecompress.outputHeight() - adjust_y));
-        } else {
-            out = tmp;
+        if (useRois) {
+            for (auto &roi : rois)
+            {
+                roi.x -= jpegDecompress.outputLeft();
+                roi.y -= jpegDecompress.outputTop();
+
+                if (scale)
+                {
+                    roi.x = ((long long)roi.x * scale_num)/scale_denom;
+                    roi.y = ((long long)roi.y * scale_num)/scale_denom;
+                    roi.width = ((long long)roi.width * scale_num)/scale_denom;
+                    roi.height = ((long long)roi.height * scale_num)/scale_denom;
+                }
+            }
         }
+
+        out = tmp;
 
         jpegDecompress.stop();
     } while(false);
@@ -819,10 +866,11 @@ void CameraV4L2::CameraLoop()
                     break;
                 }
             }
+            std::vector<cv::Rect> tmp_roi;
             bool res = frame.getImage(drawImg,
                                       false,
                                       true, 1, scale_denom,
-                                      false, cv::Rect());
+                                      false, tmp_roi);
             if (res)
             {
                 cv::putText(drawImg, std::to_string((int)(fps + (0.5))), cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0));
@@ -1056,10 +1104,11 @@ void Tracker::CalibrateCameraCharuco()
     while(mainThreadRunning && camera->isRunning())
     {
         camera->CopyFreshImageTo(*frame);
+        std::vector<cv::Rect> tmp_roi;
         bool res = frame->getImage(image,
                             false,
                             false, 1, 1,
-                            false, cv::Rect());
+                            false, tmp_roi);
         if (!res)
             continue;
 
@@ -1326,10 +1375,11 @@ void Tracker::CalibrateCamera()
             return;
         }
         camera->CopyFreshImageTo(*frame);
+        std::vector<cv::Rect> tmp_roi;
         bool res = frame->getImage(image,
                             false,
                             false, 1, 1,
-                            false, cv::Rect());
+                            false, tmp_roi);
 
         if (!res)
             continue;
@@ -1554,10 +1604,11 @@ void Tracker::CalibrateTracker()
     while (camera->isRunning() && mainThreadRunning)
     {
         camera->CopyFreshImageTo(*frame);
+        std::vector<cv::Rect> tmp_roi;
         bool res = frame->getImage(image,
                             false,
                             false, 1, 1,
-                            false, cv::Rect());
+                            false, tmp_roi);
 
         if (!res)
             continue;
@@ -2008,11 +2059,12 @@ void Tracker::MainLoop()
         // frame->getImage(gray,
         //                 true,
         //                 false, 1, 1,
-        //                 false, cv::Rect());
+        //                 false, std::vector<cv::Rect>());
+        std::vector<cv::Rect> tmp_roi;
         bool res = frame->getImage(searchGray,
                             true,
                             true, 1, 8,
-                            false, cv::Rect());
+                            false, tmp_roi);
 
         if (!res)
             continue;
@@ -2540,27 +2592,26 @@ void Tracker::MainLoop()
         double detector_apriltag = 0.0;
         double detector_post_apriltag = 0.0;
 
+        std::vector<cv::Rect> rois;
+        int scan_roi_idx = 0;
         bool scanImageValid = false;
         cv::Rect scanRoi;
-        cv::Mat scanImage;
 
+        double detector_pre_jpeg_start = clock();
         // Get images for regions-of-interest
         if (doMasking) {
             for (int i = 0; i < trackerNum; i++)
             {
+                trackerStatus[i].maskedRoisIdx.clear();
                 trackerStatus[i].maskedRois.clear();
                 trackerStatus[i].maskedImages.clear();
 
                 for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
                 {
-                    double detector_start = clock();
-                    double detector_mid0 = detector_start;
-                    double detector_mid1 = detector_start;
-                    double detector_end = detector_start;
 
+                    trackerStatus[i].maskedRoisIdx.push_back(-1);
                     trackerStatus[i].maskedRois.push_back(cv::Rect());
                     trackerStatus[i].maskedImages.push_back(cv::Mat());
-
 
                     if (trackerStatus[i].maskCenters[j].x <= 0 ||
                         trackerStatus[i].maskCenters[j].y <= 0 ||
@@ -2612,63 +2663,71 @@ void Tracker::MainLoop()
 
                         if ((w >= 8) && (h >= 8))
                         {
-                            cv::Mat detectGray;
-                            detector_mid0 = clock();
-                            bool res = frame->getImage(detectGray,
-                                                true,
-                                                false, 1, 1,
-                                                true, roi);
-                            if (!res)
-                                continue;
-                            detector_mid1 = clock();
-                            drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
+                            trackerStatus[i].maskedRoisIdx[j] = rois.size();
                             trackerStatus[i].maskedRois[j] = roi;
-                            trackerStatus[i].maskedImages[j] = detectGray;
+                            rois.push_back(roi);
+                            drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
                         }
                     }
-                    detector_end = clock();
-                    detector_pre_jpeg += detector_mid0 - detector_start;
-                    detector_jpeg += detector_mid1 - detector_mid0;
-                    detector_post_jpeg += detector_end - detector_mid1;
                 }
             }
         }
         scanImageValid = false;
         if (!(doMasking && circularWindow))
         {
-            double detector_start = clock();
-            double detector_mid0 = detector_start;
-            double detector_mid1 = detector_start;
-            double detector_end = detector_start;
             static int quadrant = 0;
-            int left = (quadrant % 4) * frame->cols()/4;
-            int top = ((quadrant / 4) % 4) * frame->rows()/4;
-            int right = ((quadrant % 4) + 1) * frame->cols()/4 - 1;
-            int bottom = (((quadrant / 4) % 4) + 1) * frame->rows()/4 - 1;
+            int left = (quadrant % 8) * frame->cols()/8;
+            int top = ((quadrant / 8) % 8) * frame->rows()/8;
+            int right = ((quadrant % 8) + 1) * frame->cols()/8 - 1;
+            int bottom = (((quadrant / 8) % 8) + 1) * frame->rows()/8 - 1;
 
             cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
 
-            cv::Mat detectGray;
-            detector_mid0 = clock();
-            bool res = frame->getImage(detectGray,
-                                true,
-                                false, 1, 1,
-                                true, roi);
-            if (res)
+            scanRoi = roi;
+            scan_roi_idx = rois.size();
+            rois.push_back(roi);
+            drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
+
+            quadrant = (quadrant + 1) % 64;
+        }
+        detector_pre_jpeg += clock() - detector_pre_jpeg_start;
+
+        double detector_jpeg_start = clock();
+
+        cv::Mat detectGray;
+        res = frame->getImage(detectGray,
+                                   true,
+                                   false, 1, 1,
+                                   true, rois);
+        if (!res)
+            continue;
+
+        detector_jpeg += clock() - detector_jpeg_start;
+
+        double detector_post_jpeg_start = clock();
+
+        if (doMasking) {
+            for (int i = 0; i < trackerNum; i++)
             {
-                detector_mid1 = clock();
+                for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
+                {
 
-                scanRoi = roi;
-                scanImage = detectGray;
-                scanImageValid = true;
-
-                quadrant = (quadrant + 1) % 16;
-                detector_end = clock();
-                detector_pre_jpeg += detector_mid0 - detector_start;
-                detector_jpeg += detector_mid1 - detector_mid0;
-                detector_post_jpeg += detector_end - detector_mid1;
+                    if (trackerStatus[i].maskedRoisIdx[j] >= 0)
+                    {
+                        cv::Rect roi = rois[trackerStatus[i].maskedRoisIdx[j]];
+                        trackerStatus[i].maskedImages[j] = cv::Mat(detectGray, roi);
+                    }
+                }
             }
         }
+        cv::Mat scanImage;
+        if (!(doMasking && circularWindow))
+        {
+            cv::Rect roi = rois[scan_roi_idx];
+            scanImageValid = true;
+            scanImage = cv::Mat(detectGray, roi);
+        }
+        detector_post_jpeg += clock() - detector_post_jpeg_start;
 
         // Run the apriltag detector
         if (doMasking) {
@@ -3307,7 +3366,7 @@ void Tracker::MainLoop()
             frame->getImage(drawImg,
                             false,
                             false, 1, scale_denom,
-                            false, cv::Rect());
+                            false, tmp_roi);
             cv::Mat drawImgMasked = cv::Mat::zeros(drawImg.size(), drawImg.type());
 
             if (privacyMode)

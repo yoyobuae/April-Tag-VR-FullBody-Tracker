@@ -2,6 +2,8 @@
 #define __JPEGWRAPPER_HPP__
 
 #include <memory>
+#include <list>
+#include <utility>
 
 #include "jpeglib.h"
 
@@ -16,13 +18,19 @@ namespace JPEGWrapper {
     class Decompress {
         struct jpeg_decompress_struct cinfo_;
         bool shouldCrop;
+        bool cropNotSet;
         JDIMENSION first_scanline;
         JDIMENSION last_scanline;
         JDIMENSION x_offset;
         JDIMENSION x_width;
+        JDIMENSION first_column;
+        JDIMENSION last_column;
 
         /* Error handling */
         std::unique_ptr<custom_error_mgr> err_mgr;
+
+        std::list<std::pair<JDIMENSION, JDIMENSION>> scanline_skips;
+        void updateScanlineSkips(unsigned int top, unsigned int bottom);
 
     public:
         Decompress();
@@ -52,6 +60,13 @@ namespace JPEGWrapper {
         /* You can call this after `start`, but before `read` or `getOutputBufferSize`. Check status() for errors */
         void setCrop(unsigned int left, unsigned int top, unsigned int width, unsigned int height);
 
+        /* Like setCrop() but allows adding multiple cropped regions. Do not combine with setCrop().
+         * Must call finishCrop() after adding all the crops. Do not call addCrop() anymore after finishCrop(). */
+        void addCrop(unsigned int left, unsigned int top, unsigned int width, unsigned int height);
+        void finishCrop();
+
+        /* Use this to find size of the buffer to allocate for the output.
+         * If using crops, only call after setting them up. */
         unsigned long int getOutputBufferSize();
 
         /* If buffer can't fit the output image then buffer is not touched. Check status() for errors */
@@ -64,7 +79,7 @@ namespace JPEGWrapper {
         JDIMENSION inputWidth() const;
         JDIMENSION inputHeight() const;
 
-        /* You can call these at any point after `start` (and `setCrop` if cropping output image), but before stop */
+        /* You can call these at any point after `start` (and `setCrop`/`addCrop` if cropping output image), but before stop */
         JDIMENSION outputLeft() const;
         JDIMENSION outputTop() const;
         JDIMENSION outputWidth() const;

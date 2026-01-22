@@ -86,6 +86,7 @@ struct TrackerStatus {
     std::vector<std::vector<double>> prevLocValues;
     std::vector<cv::Point2d> maskCenters;
     std::vector<int> maskSizes;
+    std::vector<int> maskedRoisIdx;
     std::vector<cv::Rect> maskedRois;
     std::vector<cv::Mat> maskedImages;
     std::chrono::milliseconds last_update_timestamp;
@@ -129,7 +130,7 @@ public:
     virtual bool getImage(cv::Mat& out,
                           bool grayscale,
                           bool scale, int scale_num, int scale_denom,
-                          bool useRoi, const cv::Rect& roi) = 0;
+                          bool useRois, std::vector<cv::Rect>& rois) = 0;
     virtual cv::Size size() const = 0;
     virtual int rows() const = 0;
     virtual int cols() const = 0;
@@ -148,7 +149,7 @@ public:
     virtual bool getImage(cv::Mat &out,
                           bool grayscale,
                           bool scale, int scale_num, int scale_denom,
-                          bool useRoi, const cv::Rect& roi) override;
+                          bool useRois, std::vector<cv::Rect>& roi) override;
     virtual cv::Size size() const override;
     virtual int rows() const override;
     virtual int cols() const override;
@@ -169,7 +170,7 @@ public:
     virtual bool getImage(cv::Mat &out,
                           bool grayscale,
                           bool scale, int scale_num, int scale_denom,
-                          bool useRoi, const cv::Rect& roi) override;
+                          bool useRois, std::vector<cv::Rect>& roi) override;
     virtual cv::Size size() const override;
     virtual int rows() const override;
     virtual int cols() const override;

@@ -1,4 +1,6 @@
+#include <cassert>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -7,6 +9,8 @@
 #include "jpeglib.h"
 
 #include "jpegwrapper.hpp"
+
+#define VERBOSE 0
 
 namespace JPEGWrapper {
     struct custom_error_mgr_s {
@@ -27,8 +31,11 @@ namespace JPEGWrapper {
     Decompress::Decompress()
         :  cinfo_()
         , shouldCrop(false)
+        , cropNotSet(false)
         , first_scanline(0)
         , last_scanline(0)
+        , first_column(0)
+        , last_column(0)
         , x_offset(0)
         , x_width(0)
         , err_mgr(new custom_error_mgr)
@@ -156,6 +163,132 @@ namespace JPEGWrapper {
         }
     }
 
+    void Decompress::updateScanlineSkips(unsigned int top, unsigned int bottom)
+    {
+        // Case 1: There's no crop set yet
+        if (last_scanline < first_scanline)
+            return;
+        // Case 2: New crop region completely above existing crop set
+        else if (bottom < first_scanline)
+        {
+            // Is there enough space for a skip?
+            if ((first_scanline - bottom) > 0)
+                // Add a skip between the existing crop set and the new region
+                scanline_skips.push_front({ bottom + 1, first_scanline - 1 });
+        }
+        // Case 3: New crop region completely bellow existing crop set
+        else if (last_scanline < top)
+        {
+            // Is there enough space for a skip?
+            if ((top - last_scanline) > 0)
+                // Add a skip between the existing crop set and the new region
+                scanline_skips.push_back({ last_scanline + 1, top - 1 });
+        }
+        else
+        {
+            for(auto it = scanline_skips.begin(); it != scanline_skips.end(); it++)
+            {
+                // Case 1: New crop region either completely above or bellow skip
+                if (bottom < it->first || it->second < top)
+                    continue;
+                // Case 2: New crop completely overlaps the skip
+                else if (top <= it->first && it->second <= bottom)
+                    it = scanline_skips.erase(it);
+                // Case 3: New crop clips the skip from above
+                else if (top <= it->first && bottom < it->second)
+                    it->first = bottom + 1;
+                // Case 4: New crop clips the skip from bellow
+                else if (it->first < top && it->second <= bottom)
+                    it->second = top - 1;
+                // Last Case: New crop splits the skip at the middle
+                else if (it->first < top && bottom < it->second)
+                {
+                    // Is there enough space for a skip above and bellow?
+                    if ((top - it->first) > 0 && (it->second - bottom) > 0)
+                    {
+                        auto tmp = it++;
+                        scanline_skips.insert(it, { bottom + 1, tmp->second });
+                        tmp->second = top - 1;
+                    }
+                    // Is there enough space for a skip above?
+                    else if ((top - it->first) > 0)
+                    {
+                        it->second = top - 1;
+                    }
+                    // Is there enough space for a skip bellow?
+                    else if ((it->second - bottom) > 0)
+                    {
+                        it->first = bottom + 1;
+                    }
+                }
+                else
+                {
+                    // This should never happen
+                    assert(false);
+                }
+            }
+        }
+    }
+
+    void Decompress::addCrop(unsigned int left, unsigned int top,
+                             unsigned int width, unsigned int height)
+    {
+#if VERBOSE
+        std::cout << "Decompress::addCrop("
+            << left << ", "
+            << top << ", "
+            << width << ", "
+            << height << ")" << std::endl;
+#endif
+
+        if (!shouldCrop)
+        {
+            first_scanline = std::numeric_limits<JDIMENSION>::max();
+            last_scanline = 0;
+            first_column = std::numeric_limits<JDIMENSION>::max();
+            last_column = 0;
+        }
+
+        updateScanlineSkips(top, top + height);
+
+#if VERBOSE
+        std::cout << "first_scanline:" << first_scanline << std::endl;
+        std::cout << "last_scanline:" << last_scanline << std::endl;
+        std::cout << "first_column:" << first_column << std::endl;
+        std::cout << "last_column:" << last_column << std::endl;
+#endif
+        if (top < first_scanline)
+            first_scanline = top;
+        if (last_scanline < (top + height))
+            last_scanline = top + height;
+        if (left < first_column)
+            first_column = left;
+        if (last_column < (left + width))
+            last_column = left + width;
+
+#if VERBOSE
+        std::cout << "first_scanline:" << first_scanline << std::endl;
+        std::cout << "last_scanline:" << last_scanline << std::endl;
+        std::cout << "first_column:" << first_column << std::endl;
+        std::cout << "last_column:" << last_column << std::endl;
+#endif
+
+        shouldCrop = true;
+        cropNotSet = true;
+    }
+
+    void Decompress::finishCrop()
+    {
+        if (shouldCrop || cropNotSet)
+        {
+            cropNotSet = false;
+            setCrop(first_column,
+                    first_scanline,
+                    last_column - first_column,
+                    last_scanline - first_scanline);
+        }
+    }
+
     unsigned long int Decompress::getOutputBufferSize()
     {
         int row_stride = cinfo_.output_width * cinfo_.out_color_components;
@@ -164,6 +297,10 @@ namespace JPEGWrapper {
 
     void Decompress::read(unsigned char *outbuffer, unsigned long int outsize)
     {
+#if VERBOSE
+        std::cout << "Decompress::read(" << (void *)outbuffer << ", " << outsize << ")" << std::endl;
+#endif
+
         if (setjmp(err_mgr->setjmp_buffer))
         {
             // error setting mem source
@@ -175,30 +312,80 @@ namespace JPEGWrapper {
             int row_stride = cinfo_.output_width * cinfo_.out_color_components;
             int required_outsize = row_stride * outputHeight();
 
+#if VERBOSE
+            std::cout << "row_stride: " << row_stride << std::endl;
+            std::cout << "required_outsize: " << required_outsize << std::endl;
+#endif
+
             if (required_outsize > outsize) {
                 return;
             }
 
             if (shouldCrop) {
-                jpeg_skip_scanlines(&cinfo_, first_scanline);
+                if (first_scanline > 0)
+                    jpeg_skip_scanlines(&cinfo_, first_scanline);
             }
             else
             {
                 last_scanline = cinfo_.output_height;
             }
 
+#if VERBOSE
+            std::cout << "first_scanline: " << first_scanline << std::endl;
+            std::cout << "last_scanline: " << last_scanline << std::endl;
+#endif
             std::vector<JSAMPROW> row_pointer;
             row_pointer.resize(cinfo_.rec_outbuf_height);
 
+#if VERBOSE
+            std::cout << "row_pointer.data(): " << row_pointer.data() << std::endl;
+            std::cout << "row_pointer.size(): " << row_pointer.size() << std::endl;
+#endif
+
+            auto skips_it = scanline_skips.begin();
+
             while (cinfo_.output_scanline < last_scanline) {
+#if VERBOSE
+                std::cout << "cinfo_.output_scanline " << cinfo_.output_scanline << std::endl;
+                std::cout << "cinfo_.rec_outbuf_height: " << cinfo_.rec_outbuf_height << std::endl;
+#endif
                 for (int i = 0; i < cinfo_.rec_outbuf_height; i++) {
                     row_pointer[i] = outbuffer + row_stride * (i + cinfo_.output_scanline - first_scanline);
+#if VERBOSE
+                    std::cout << "i: " << i << std::endl;
+                    std::cout << "row_pointer[i]: " << (void *)row_pointer[i] << std::endl;
+#endif
                 }
+#if VERBOSE
+                std::cout << "jpeg_read_scanlines(" << &cinfo_ << ", " << row_pointer.data() << ", " << cinfo_.rec_outbuf_height << ")" << std::endl;
+#endif
                 jpeg_read_scanlines(&cinfo_, row_pointer.data(), cinfo_.rec_outbuf_height);
+
+                while (shouldCrop && skips_it != scanline_skips.end() && cinfo_.output_scanline > skips_it->second)
+                {
+#if VERBOSE
+                    std::cout << "skips_it->first: " << skips_it->first << std::endl;
+                    std::cout << "skips_it->second: " << skips_it->second << std::endl;
+#endif
+                    skips_it++;
+#if VERBOSE
+                    std::cout << "skips_it++" << std::endl;
+#endif
+                }
+                if (shouldCrop && skips_it != scanline_skips.end() && cinfo_.output_scanline >= skips_it->first)
+                {
+#if VERBOSE
+                    std::cout << "skips_it->first: " << skips_it->first << std::endl;
+                    std::cout << "skips_it->second: " << skips_it->second << std::endl;
+#endif
+                    // Is there's enough space for a skip?
+                    if ((skips_it->second - cinfo_.output_scanline) > 0)
+                        jpeg_skip_scanlines(&cinfo_, skips_it->second - cinfo_.output_scanline);
+                }
             }
 
-            if (shouldCrop) {
-                jpeg_skip_scanlines(&cinfo_, cinfo_.output_height - cinfo_.output_scanline);
+            if (shouldCrop && (cinfo_.output_height - cinfo_.output_scanline) > 0) {
+               jpeg_skip_scanlines(&cinfo_, cinfo_.output_height - cinfo_.output_scanline);
             }
         }
     }
