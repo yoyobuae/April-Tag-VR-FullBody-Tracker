@@ -2607,10 +2607,6 @@ void Tracker::MainLoop()
 
                         cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
 
-                        std::vector<int> temp_ids;
-                        std::vector<std::vector<cv::Point2f> > temp_corners;
-                        std::vector<cv::Point2f> temp_centers;
-
                         const int w = static_cast<int>(roi.width);
                         const int h = static_cast<int>(roi.height);
 
@@ -2651,10 +2647,6 @@ void Tracker::MainLoop()
             int bottom = (((quadrant / 4) % 4) + 1) * frame->rows()/4 - 1;
 
             cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
-
-            std::vector<int> temp_ids;
-            std::vector<std::vector<cv::Point2f> > temp_corners;
-            std::vector<cv::Point2f> temp_centers;
 
             cv::Mat detectGray;
             detector_mid0 = clock();
