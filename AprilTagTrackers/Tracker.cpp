@@ -1898,7 +1898,7 @@ void Tracker::MainLoop()
     AprilTagWrapper april{parameters};
 
     int framesSinceLastSeen = 0;
-    int framesToCheckAll = 3;
+    int framesToCheckAll = 0;
 
     cv::Mat stationPos = (cv::Mat_<double>(4, 1) << 0, 0, 0, 1);
     stationPos = wtranslation * stationPos;
