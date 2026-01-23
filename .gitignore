@@ -1,5 +1,7 @@
 /build
-/build.backup
+/build.backup*
+/debug
+/debug.backup*
 *.photos
 /python
 /.vs
