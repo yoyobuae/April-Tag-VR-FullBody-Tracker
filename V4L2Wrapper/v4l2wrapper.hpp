@@ -26,6 +26,7 @@ namespace V4L2Wrapper {
         ~Buffer();
 
         Status getStatus() const { return status; }
+        double getTime() { return (double)buf.timestamp.tv_sec + (double)buf.timestamp.tv_usec/1e6; }
         void *Data() { return buffer_start; }
         uint32_t Size() { return buf.bytesused; }
 

@@ -834,6 +834,7 @@ void CameraV4L2::CameraLoop()
 
     while (cameraRunning)
     {
+        double frame_time = get_timestamp();
         {
             auto buf = std::unique_ptr<V4L2Wrapper::Buffer>(new V4L2Wrapper::Buffer(dev));
             if (buf->getStatus() == V4L2Wrapper::Error) {
@@ -846,6 +847,7 @@ void CameraV4L2::CameraLoop()
                 cameraRunning = false;
                 break;
             }
+            frame_time = buf->getTime();
             frame.swap(buf);
         }
 
@@ -930,7 +932,7 @@ void CameraV4L2::CameraLoop()
             cameraFrame->swap(frame);
 
             cameraFrame->ready = true;
-            cameraFrame->captureTime = last_frame_time;
+            cameraFrame->captureTime = frame_time;
             cameraFrame->swapTime = get_timestamp();
         }
         cameraFrameCondVar.notify_one();
