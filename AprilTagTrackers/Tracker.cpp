@@ -585,6 +585,11 @@ void CameraOCV::StartStop(std::string id, int apiPreference)
     cameraThread.detach();
 }
 
+double get_timestamp()
+{
+    return static_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 void CameraOCV::CameraLoop()
 {
     bool previewShown = false;
@@ -606,7 +611,7 @@ void CameraOCV::CameraLoop()
     cv::Mat img;
     cv::Mat drawImg;
     double fps = 0;
-    clock_t last_frame_time = clock();
+    double last_frame_time = get_timestamp();
     bool frame_visible = false;
     int cols, rows;
 
@@ -625,8 +630,8 @@ void CameraOCV::CameraLoop()
             cameraRunning = false;
             break;
         }
-        clock_t curtime = clock();
-        fps = 0.95*fps + 0.05/(double(curtime - last_frame_time) / double(CLOCKS_PER_SEC));
+        double curtime = get_timestamp();
+        fps = 0.95*fps + 0.05/(curtime - last_frame_time);
         last_frame_time = curtime;        
         std::string resolution = std::to_string(img.cols) + "x" + std::to_string(img.rows);
         if (tracker->previewCamera || tracker->previewCameraCalibration)
@@ -699,7 +704,7 @@ void CameraOCV::CameraLoop()
             }
             cameraFrame->ready = true;
             cameraFrame->captureTime = last_frame_time;
-            cameraFrame->swapTime = clock();
+            cameraFrame->swapTime = get_timestamp();
         }
         cameraFrameCondVar.notify_one();
 
@@ -732,7 +737,7 @@ void CameraOCV::CopyFreshImageTo(FrameData& frame)
             // }
             frame.captureTime = cameraFrame->captureTime;
             frame.swapTime = cameraFrame->swapTime;
-            frame.copyFreshTime = clock();
+            frame.copyFreshTime = get_timestamp();
             return;
         }
     }
@@ -817,7 +822,7 @@ void CameraV4L2::CameraLoop()
     }
     cv::Mat drawImg;
     double fps = 0;
-    clock_t last_frame_time = clock();
+    double last_frame_time = get_timestamp();
     bool frame_visible = false;
     int cols, rows;
     int frame_count = 0;
@@ -848,8 +853,8 @@ void CameraV4L2::CameraLoop()
             setCameraParams();
         }
 
-        clock_t curtime = clock();
-        fps = 0.95*fps + 0.05/(double(curtime - last_frame_time) / double(CLOCKS_PER_SEC));
+        double curtime = get_timestamp();
+        fps = 0.95*fps + 0.05/(curtime - last_frame_time);
         last_frame_time = curtime;        
 
         if (tracker->previewCamera || tracker->previewCameraCalibration)
@@ -926,7 +931,7 @@ void CameraV4L2::CameraLoop()
 
             cameraFrame->ready = true;
             cameraFrame->captureTime = last_frame_time;
-            cameraFrame->swapTime = clock();
+            cameraFrame->swapTime = get_timestamp();
         }
         cameraFrameCondVar.notify_one();
         frame_count++;
@@ -1000,7 +1005,7 @@ void CameraV4L2::CopyFreshImageTo(FrameData& frame)
             frame.swap(*cameraFrame);
             frame.captureTime = cameraFrame->captureTime;
             frame.swapTime = cameraFrame->swapTime;
-            frame.copyFreshTime = clock();
+            frame.copyFreshTime = get_timestamp();
             return;
         }
     }
@@ -1076,7 +1081,7 @@ void Tracker::CalibrateCameraCharuco()
     params->markerBorderBits = 1;
 
     //int framesSinceLast = -2 * parameters->camFps;
-    clock_t timeOfLast = clock();
+    double timeOfLast = get_timestamp();
 
     int messageDialogResponse = wxID_CANCEL;
     std::thread th{ [this, &messageDialogResponse]() {
@@ -1182,7 +1187,7 @@ void Tracker::CalibrateCameraCharuco()
                         });
 
         //framesSinceLast++;
-        if (key != -1 || double(clock() - timeOfLast) / (5*double(CLOCKS_PER_SEC)) > 1)
+        if (key != -1 || (get_timestamp() - timeOfLast) > 5.0)
         {
             //framesSinceLast = 0;
             //if any button was pressed
@@ -1240,7 +1245,7 @@ void Tracker::CalibrateCameraCharuco()
                     }
                 }
             }
-            timeOfLast = clock();
+            timeOfLast = get_timestamp();
         }
     }
 
@@ -1618,9 +1623,9 @@ void Tracker::CalibrateTracker()
             cv::rotate(image, image, rotateFlag);
         }
 
-        clock_t start;
+        double start;
         //clock for timing of detection
-        start = clock();
+        start = get_timestamp();
 
         //detect and draw all markers on image
         std::vector<int> ids;
@@ -1913,7 +1918,7 @@ void Tracker::MainLoop()
 
     bool calibControllerPosActive = false;
     bool calibControllerAngleActive = false;
-    clock_t calibControllerLastPress = clock();
+    double calibControllerLastPress = get_timestamp();
     double calibControllerPosOffset[] = { 0,0,0 };
     double calibControllerAngleOffset[] = { 0,0,0 };
 
@@ -1999,7 +2004,7 @@ void Tracker::MainLoop()
 
         // Fetch the predicted pose from driver side
         {
-            double frameTime = double(clock() - frame->captureTime) / double(CLOCKS_PER_SEC);
+            double frameTime = (get_timestamp() - frame->captureTime);
 
             std::stringstream ss;
 
@@ -2053,7 +2058,7 @@ void Tracker::MainLoop()
             }
         }
 
-        frame->getPoseTime = clock();
+        frame->getPoseTime = get_timestamp();
 
         // Convert camera frame to grayscale
         // frame->getImage(gray,
@@ -2069,11 +2074,11 @@ void Tracker::MainLoop()
         if (!res)
             continue;
 
-        frame->toGrayTime = clock();
+        frame->toGrayTime = get_timestamp();
 
-        clock_t start, end;
+        double start, end;
         //for timing our detection
-        start = clock();
+        start = get_timestamp();
 
         // Preparation to calculate ROI windows
         bool circularWindow = parameters->circularWindow;
@@ -2185,7 +2190,7 @@ void Tracker::MainLoop()
 
         }
 
-        frame->processPoseTime = clock();
+        frame->processPoseTime = get_timestamp();
 
         didMatchTemplate = false;
 
@@ -2370,7 +2375,7 @@ void Tracker::MainLoop()
             }
         }
 
-        frame->templateMatchTime = clock();
+        frame->templateMatchTime = get_timestamp();
 
         //Then define your mask image
 #if 0
@@ -2425,7 +2430,7 @@ void Tracker::MainLoop()
         }
 #endif
 
-        frame->doMaskTime = clock();
+        frame->doMaskTime = get_timestamp();
 
         //cv::imshow("test", image);
 
@@ -2435,7 +2440,7 @@ void Tracker::MainLoop()
             int inputButton = 0;
             inputButton = connection->GetButtonStates();
 
-            double timeSincePress = double(start - calibControllerLastPress) / double(CLOCKS_PER_SEC);
+            double timeSincePress = (start - calibControllerLastPress);
             if (timeSincePress > 60)                                                                        //we exit playspace calibration after 30 seconds of no input detected
             {
                 gui->cb3->SetValue(false);
@@ -2445,7 +2450,7 @@ void Tracker::MainLoop()
 
             if (inputButton == 1)       //logic for position button first
             {
-                double timeSincePress = double(start - calibControllerLastPress) / double(CLOCKS_PER_SEC);
+                double timeSincePress = (start - calibControllerLastPress);
                 if (timeSincePress >= 0.2)
                 {
                     if (!calibControllerPosActive)          //if position calibration is inactive, set it to active and calculate offsets 
@@ -2464,7 +2469,7 @@ void Tracker::MainLoop()
 
                         quat.inverse().QuatRotation(calibControllerPosOffset);
 
-                        calibControllerLastPress = clock();
+                        calibControllerLastPress = get_timestamp();
 
                     }
                     else       //else, check if button was unpressed for half a second, then set it to inactive
@@ -2472,11 +2477,11 @@ void Tracker::MainLoop()
                         calibControllerPosActive = false;
                     }
                 }
-                calibControllerLastPress = clock();
+                calibControllerLastPress = get_timestamp();
             }
             if (inputButton == 2)       //logic for position button first
             {
-                double timeSincePress = double(start - calibControllerLastPress) / double(CLOCKS_PER_SEC);
+                double timeSincePress = (start - calibControllerLastPress);
                 if (timeSincePress >= 0.2)
                 {
                     if (!calibControllerAngleActive)          //if position calibration is inactive, set it to active and calculate offsets 
@@ -2494,7 +2499,7 @@ void Tracker::MainLoop()
                         calibControllerAngleOffset[1] = angleB - gui->manualCalibB->value;
                         calibControllerAngleOffset[2] = xyzLen;
 
-                        calibControllerLastPress = clock();
+                        calibControllerLastPress = get_timestamp();
 
                     }
                     else       //else, check if button was unpressed for half a second, then set it to inactive
@@ -2502,7 +2507,7 @@ void Tracker::MainLoop()
                         calibControllerAngleActive = false;
                     }
                 }
-                calibControllerLastPress = clock();
+                calibControllerLastPress = get_timestamp();
             }
 
             if (calibControllerPosActive)
@@ -2578,7 +2583,7 @@ void Tracker::MainLoop()
         }
         else
         {
-            calibControllerLastPress = clock();
+            calibControllerLastPress = get_timestamp();
         }
 
         corners.clear();
@@ -2597,7 +2602,7 @@ void Tracker::MainLoop()
         bool scanImageValid = false;
         cv::Rect scanRoi;
 
-        double detector_pre_jpeg_start = clock();
+        double detector_pre_jpeg_start = get_timestamp();
         // Get images for regions-of-interest
         if (doMasking) {
             for (int i = 0; i < trackerNum; i++)
@@ -2690,9 +2695,9 @@ void Tracker::MainLoop()
 
             quadrant = (quadrant + 1) % 64;
         }
-        detector_pre_jpeg += clock() - detector_pre_jpeg_start;
+        detector_pre_jpeg += get_timestamp() - detector_pre_jpeg_start;
 
-        double detector_jpeg_start = clock();
+        double detector_jpeg_start = get_timestamp();
 
         cv::Mat detectGray;
         res = frame->getImage(detectGray,
@@ -2702,9 +2707,9 @@ void Tracker::MainLoop()
         if (!res)
             continue;
 
-        detector_jpeg += clock() - detector_jpeg_start;
+        detector_jpeg += get_timestamp() - detector_jpeg_start;
 
-        double detector_post_jpeg_start = clock();
+        double detector_post_jpeg_start = get_timestamp();
 
         if (doMasking) {
             for (int i = 0; i < trackerNum; i++)
@@ -2727,7 +2732,7 @@ void Tracker::MainLoop()
             scanImageValid = true;
             scanImage = cv::Mat(detectGray, roi);
         }
-        detector_post_jpeg += clock() - detector_post_jpeg_start;
+        detector_post_jpeg += get_timestamp() - detector_post_jpeg_start;
 
         // Run the apriltag detector
         if (doMasking) {
@@ -2735,7 +2740,7 @@ void Tracker::MainLoop()
             {
                 for (int j = 0; j < trackerStatus[i].maskCenters.size(); j++)
                 {
-                    double detector_start = clock();
+                    double detector_start = get_timestamp();
                     double detector_mid0 = detector_start;
                     double detector_mid1 = detector_start;
                     double detector_end = detector_start;
@@ -2762,9 +2767,9 @@ void Tracker::MainLoop()
 
                         if ((w >= 8) && (h >= 8))
                         {
-                            detector_mid0 = clock();
+                            detector_mid0 = get_timestamp();
                             april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
-                            detector_mid1 = clock();
+                            detector_mid1 = get_timestamp();
 
                             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
                             {
@@ -2793,7 +2798,7 @@ void Tracker::MainLoop()
                             }
                         }
                     }
-                    detector_end = clock();
+                    detector_end = get_timestamp();
                     detector_pre_apriltag += detector_mid0 - detector_start;
                     detector_apriltag += detector_mid1 - detector_mid0;
                     detector_post_apriltag += detector_end - detector_mid1;
@@ -2802,7 +2807,7 @@ void Tracker::MainLoop()
         }
         if (!(doMasking && circularWindow && scanImageValid))
         {
-            double detector_start = clock();
+            double detector_start = get_timestamp();
             double detector_mid0 = detector_start;
             double detector_mid1 = detector_start;
             double detector_end = detector_start;
@@ -2814,9 +2819,9 @@ void Tracker::MainLoop()
             std::vector<std::vector<cv::Point2f> > temp_corners;
             std::vector<cv::Point2f> temp_centers;
 
-            detector_mid0 = clock();
+            detector_mid0 = get_timestamp();
             april.detectMarkers(detectGray, &temp_corners, &temp_ids, &temp_centers, trackers);
-            detector_mid1 = clock();
+            detector_mid1 = get_timestamp();
 
             for (int k = 0; k < temp_ids.size(); k++)        //check all of the found markers
             {
@@ -2843,7 +2848,7 @@ void Tracker::MainLoop()
                 ids.push_back(temp_ids[k]);
                 centers.push_back(temp_centers[k]);
             }
-            detector_end = clock();
+            detector_end = get_timestamp();
             detector_pre_apriltag += detector_mid0 - detector_start;
             detector_apriltag += detector_mid1 - detector_mid0;
             detector_post_apriltag += detector_end - detector_mid1;
@@ -2855,7 +2860,7 @@ void Tracker::MainLoop()
         frame->preApriltagTime = frame->postJpegTime + detector_pre_apriltag;
         frame->apriltagTime = frame->preApriltagTime + detector_apriltag;
         frame->postApriltagTime = frame->apriltagTime + detector_post_apriltag;
-        frame->detectTime = clock();
+        frame->detectTime = get_timestamp();
 
         // Store a snapshot image of each tracker
         for (int i = 0; i < trackerNum; ++i)
@@ -3133,8 +3138,8 @@ void Tracker::MainLoop()
                 continue;
 #endif
 
-            end = clock();
-            double frameTime = double(end - frame->captureTime) / double(CLOCKS_PER_SEC);
+            end = get_timestamp();
+            double frameTime = (end - frame->captureTime);
 
             if (!multicamAutocalib) {
                 // Send tracker positions/rotations to driver
@@ -3328,7 +3333,7 @@ void Tracker::MainLoop()
 
         }
 
-        frame->sendTrackerTime = clock();
+        frame->sendTrackerTime = get_timestamp();
 
         for (int i = 0; i < corners.size(); i++) {
             for (int j = 0; j < corners[i].size(); j++) {
@@ -3396,8 +3401,8 @@ void Tracker::MainLoop()
                 cv::aruco::drawDetectedMarkers(drawImg, corners, ids);
             }
 
-            end = clock();
-            double frameTime = double(end - start) / double(CLOCKS_PER_SEC);
+            end = get_timestamp();
+            double frameTime = (end - start);
 
 
             int cols, rows;
@@ -3461,21 +3466,21 @@ void Tracker::MainLoop()
                 { "ultramarine", cv::Scalar(211, 105, 47) },
             };
 
-            int frameWriteMsecs = int(10000.0 * double(frame->swapTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int frameReadMsecs = int(10000.0 * double(frame->copyFreshTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int getPoseMsecs = int(10000.0 * double(frame->getPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int toGrayMsecs = int(10000.0 * double(frame->toGrayTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int processPoseMsecs = int(10000.0 * double(frame->processPoseTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int templMatchMsecs = int(10000.0 * double(frame->templateMatchTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int doMaskMsecs = int(10000.0 * double(frame->doMaskTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int preJpegMsecs = int(10000.0 * double(frame->preJpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int jpegMsecs = int(10000.0 * double(frame->jpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int postJpegMsecs = int(10000.0 * double(frame->postJpegTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int preApriltagMsecs = int(10000.0 * double(frame->preApriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int apriltagMsecs = int(10000.0 * double(frame->apriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int postApriltagMsecs = int(10000.0 * double(frame->postApriltagTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int detectMsecs = int(10000.0 * double(frame->detectTime - frame->captureTime) / double(CLOCKS_PER_SEC));
-            int sendTrackerMsecs = int(10000.0 * double(frame->sendTrackerTime - frame->captureTime) / double(CLOCKS_PER_SEC));
+            int frameWriteMsecs = int(10000.0 * (frame->swapTime - frame->captureTime));
+            int frameReadMsecs = int(10000.0 * (frame->copyFreshTime - frame->captureTime));
+            int getPoseMsecs = int(10000.0 * (frame->getPoseTime - frame->captureTime));
+            int toGrayMsecs = int(10000.0 * (frame->toGrayTime - frame->captureTime));
+            int processPoseMsecs = int(10000.0 * (frame->processPoseTime - frame->captureTime));
+            int templMatchMsecs = int(10000.0 * (frame->templateMatchTime - frame->captureTime));
+            int doMaskMsecs = int(10000.0 * (frame->doMaskTime - frame->captureTime));
+            int preJpegMsecs = int(10000.0 * (frame->preJpegTime - frame->captureTime));
+            int jpegMsecs = int(10000.0 * (frame->jpegTime - frame->captureTime));
+            int postJpegMsecs = int(10000.0 * (frame->postJpegTime - frame->captureTime));
+            int preApriltagMsecs = int(10000.0 * (frame->preApriltagTime - frame->captureTime));
+            int apriltagMsecs = int(10000.0 * (frame->apriltagTime - frame->captureTime));
+            int postApriltagMsecs = int(10000.0 * (frame->postApriltagTime - frame->captureTime));
+            int detectMsecs = int(10000.0 * (frame->detectTime - frame->captureTime));
+            int sendTrackerMsecs = int(10000.0 * (frame->sendTrackerTime - frame->captureTime));
 
             rectangle(statsImg, cv::Point(statsCurX, 0),                                cv::Point(statsCurX + 2, statsImg.rows),                     colors["black"], -1);                        // Clear
             rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - 0),                cv::Point(statsCurX + 2, statsImg.rows - frameWriteMsecs),   colors["ultramarine"], -1);

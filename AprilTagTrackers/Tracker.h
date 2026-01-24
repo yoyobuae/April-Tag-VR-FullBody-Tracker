@@ -107,22 +107,22 @@ class FrameData
 {
 public:
     bool ready = false;
-    clock_t captureTime;
-    clock_t swapTime;
-    clock_t copyFreshTime;
-    clock_t toGrayTime;
-    clock_t getPoseTime;
-    clock_t processPoseTime;
-    clock_t templateMatchTime;
-    clock_t doMaskTime;
-    clock_t preJpegTime;
-    clock_t jpegTime;
-    clock_t postJpegTime;
-    clock_t preApriltagTime;
-    clock_t apriltagTime;
-    clock_t postApriltagTime;
-    clock_t detectTime;
-    clock_t sendTrackerTime;
+    double captureTime;
+    double swapTime;
+    double copyFreshTime;
+    double toGrayTime;
+    double getPoseTime;
+    double processPoseTime;
+    double templateMatchTime;
+    double doMaskTime;
+    double preJpegTime;
+    double jpegTime;
+    double postJpegTime;
+    double preApriltagTime;
+    double apriltagTime;
+    double postApriltagTime;
+    double detectTime;
+    double sendTrackerTime;
 
     virtual ~FrameData() { }
 
