@@ -932,7 +932,7 @@ void CameraV4L2::CameraLoop()
             cameraFrame->swap(frame);
 
             cameraFrame->ready = true;
-            cameraFrame->captureTime = frame_time;
+            cameraFrame->captureTime = last_frame_time;
             cameraFrame->swapTime = get_timestamp();
         }
         cameraFrameCondVar.notify_one();
