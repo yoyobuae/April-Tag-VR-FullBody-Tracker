@@ -1754,9 +1754,11 @@ void Tracker::MainLoop1()
                     if (isResting1 || isResting2)
                     {
                         calibratorProjected1.push_back(projected1[1]);
+                        calibratorProjectedTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
                         if (tracker_pose_valid[i] == 0)
                         {
                             calibratorReprojected2.push_back(projected2[1]);
+                            calibratorReprojectedTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
                         }
 
                         calibratorPoints1.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
@@ -1764,6 +1766,7 @@ void Tracker::MainLoop1()
 
                         if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
                         {
+                            reprojectionError(calibratorProjected1, calibratorReprojected1, calibratorProjectedTimes1, calibratorReprojectedTimes1);
                             cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                             wtranslation2 = wtranslation * wtranslation2;
                             cv::Mat R = (cv::Mat_<double>(3, 3) <<
@@ -1789,8 +1792,12 @@ void Tracker::MainLoop1()
 
                             calibratorProjected1.clear();
                             calibratorProjected2.clear();
+                            calibratorProjectedTimes1.clear();
+                            calibratorProjectedTimes2.clear();
                             calibratorReprojected1.clear();
                             calibratorReprojected2.clear();
+                            calibratorReprojectedTimes1.clear();
+                            calibratorReprojectedTimes2.clear();
                             calibratorPoints1.clear();
                             calibratorPoints2.clear();
                             calibratorTimes1.clear();
@@ -2392,9 +2399,11 @@ void Tracker::MainLoop2()
                     if (isResting1 || isResting2)
                     {
                         calibratorProjected2.push_back(projected2[1]);
+                        calibratorProjectedTimes2.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
                         if (tracker_pose_valid[i] == 0)
                         {
                             calibratorReprojected1.push_back(projected1[1]);
+                            calibratorReprojectedTimes1.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
                         }
 
                         calibratorPoints2.push_back(cv::Point3d(rpos.at<double>(0,0), rpos.at<double>(1,0), rpos.at<double>(2,0)));
@@ -2402,6 +2411,7 @@ void Tracker::MainLoop2()
 
                         if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
                         {
+                            reprojectionError(calibratorProjected1, calibratorReprojected2, calibratorProjectedTimes1, calibratorReprojectedTimes2);
                             cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                             wtranslation2 = wtranslation * wtranslation2;
                             cv::Mat R = (cv::Mat_<double>(3, 3) <<
@@ -2427,8 +2437,12 @@ void Tracker::MainLoop2()
 
                             calibratorProjected1.clear();
                             calibratorProjected2.clear();
+                            calibratorProjectedTimes1.clear();
+                            calibratorProjectedTimes2.clear();
                             calibratorReprojected1.clear();
                             calibratorReprojected2.clear();
+                            calibratorReprojectedTimes1.clear();
+                            calibratorReprojectedTimes2.clear();
                             calibratorPoints1.clear();
                             calibratorPoints2.clear();
                             calibratorTimes1.clear();

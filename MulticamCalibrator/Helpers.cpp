@@ -602,3 +602,150 @@ cv::Mat transformFromPoints(std::vector<cv::Point3d> &Apoints, std::vector<cv::P
 
     return (cv::Mat_<double>(4, 4) << ret_R(0, 0), ret_R(0, 1), ret_R(0, 2), ret_t(0), ret_R(1, 0), ret_R(1, 1), ret_R(1, 2), ret_t(1), ret_R(2, 0), ret_R(2, 1), ret_R(2, 2), ret_t(2), 0, 0, 0, 1);
 }
+
+using PointSet2 = Eigen::Matrix<double, 2, Eigen::Dynamic>;
+void reprojectionError(std::vector<cv::Point2d> &Apoints, std::vector<cv::Point2d> &Bpoints, std::vector<long> &Atimes, std::vector<long> &Btimes)
+{
+    PointSet2 A(2, 1);
+    PointSet2 B(2, 1);
+
+    int i = 0, j = 0;
+    double ax, ay, bx, by;
+    long atime, btime;
+
+    if (i >= Apoints.size() || i >= Atimes.size())
+        return;
+    if (j >= Bpoints.size() || j >= Btimes.size())
+        return;
+
+    ax = Apoints[i].x;
+    ay = Apoints[i].y;
+    atime = Atimes[i];
+
+    bx = Bpoints[j].x;
+    by = Bpoints[j].y;
+    btime = Btimes[j];
+
+    bool advanceA = (atime < btime);
+    Eigen::Index aindex = 0, bindex = 0;
+    while (true)
+    {
+        if (advanceA)
+        {
+            i++;
+            if (i >= Apoints.size() || i >= Atimes.size())
+                break;
+
+            double new_ax, new_ay;
+            long new_atime;
+
+            new_ax = Apoints[i].x;
+            new_ay = Apoints[i].y;
+            new_atime = Atimes[i];
+
+            if (new_atime < btime)
+            {
+                ax = new_ax;
+                ay = new_ay;
+                atime = new_atime;
+            }
+            else
+            {
+                if (A.cols() <= aindex)
+                {
+                    A.conservativeResize(2, A.cols()*2);
+                }
+                if (B.cols() <= bindex)
+                {
+                    B.conservativeResize(2, B.cols()*2);
+                }
+
+                A(0, aindex) = ax;
+                A(1, aindex) = ay;
+
+                B(0, bindex) = bx;
+                B(1, bindex) = by;
+
+                aindex++;
+                bindex++;
+
+                ax = new_ax;
+                ay = new_ay;
+                atime = new_atime;
+
+                j++;
+                if (j >= Bpoints.size() || j >= Btimes.size())
+                    break;
+
+                bx = Bpoints[j].x;
+                by = Bpoints[j].y;
+                btime = Btimes[j];
+
+                advanceA = false;
+            }
+        }
+        else
+        {
+            j++;
+            if (j >= Bpoints.size() || j >= Btimes.size())
+                break;
+
+            double new_bx, new_by;
+            long new_btime;
+
+            new_bx = Bpoints[j].x;
+            new_by = Bpoints[j].y;
+            new_btime = Btimes[j];
+
+            if (new_btime < atime)
+            {
+                bx = new_bx;
+                by = new_by;
+                btime = new_btime;
+            }
+            else
+            {
+                if (A.cols() <= aindex)
+                {
+                    A.conservativeResize(2, A.cols()*2);
+                }
+                if (B.cols() <= bindex)
+                {
+                    B.conservativeResize(2, B.cols()*2);
+                }
+
+                A(0, aindex) = ax;
+                A(1, aindex) = ay;
+
+                B(0, bindex) = bx;
+                B(1, bindex) = by;
+
+                aindex++;
+                bindex++;
+
+                bx = new_bx;
+                by = new_by;
+                btime = new_btime;
+
+                i++;
+                if (i >= Apoints.size() || i >= Atimes.size())
+                    break;
+
+                ax = Apoints[i].x;
+                ay = Apoints[i].y;
+                atime = Atimes[i];
+
+                advanceA = true;
+            }
+        }
+    }
+    A.conservativeResize(2, aindex);
+    B.conservativeResize(2, bindex);
+
+    auto diffAB = A - B;
+    double sumSquaredNorm = diffAB.colwise().squaredNorm().sum();
+    auto reprojErrorRMS = sqrt(sumSquaredNorm/static_cast<double>(aindex));
+
+    std::cout << "reprojErrorRMS = " << reprojErrorRMS << std::endl;
+}
+

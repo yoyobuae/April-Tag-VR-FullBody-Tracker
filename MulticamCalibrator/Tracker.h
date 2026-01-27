@@ -122,6 +122,10 @@ private:
     std::vector<cv::Point2d> calibratorReprojected2;
     std::vector<cv::Point3d> calibratorPoints1;
     std::vector<cv::Point3d> calibratorPoints2;
+    std::vector<long> calibratorProjectedTimes1;
+    std::vector<long> calibratorProjectedTimes2;
+    std::vector<long> calibratorReprojectedTimes1;
+    std::vector<long> calibratorReprojectedTimes2;
     std::vector<long> calibratorTimes1;
     std::vector<long> calibratorTimes2;
     int pointsThreshold = 30;

@@ -21,4 +21,5 @@ Quaternion<double> mRot2Quat(const cv::Mat& m);
 cv::Mat getSpaceCalibEuler(cv::Vec3d rvec, cv::Vec3d tvec, double xOffset, double yOffset, double zOffset);
 cv::Vec3d quat2rodr(double qw, double qx, double qy, double qz);
 cv::Mat transformFromPoints(std::vector<cv::Point3d> &Apoints, std::vector<cv::Point3d> &Bpoints, std::vector<long> &Atimes, std::vector<long> &Btimes);
+void reprojectionError(std::vector<cv::Point2d> &Apoints, std::vector<cv::Point2d> &Bpoints, std::vector<long> &Atimes, std::vector<long> &Btimes);
 
