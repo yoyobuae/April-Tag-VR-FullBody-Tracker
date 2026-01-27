@@ -5,6 +5,7 @@
 #include <random>
 #include <sstream>
 #include <typeinfo>
+#include <utility>
 #include <vector>
 
 #pragma warning(push)
@@ -3504,6 +3505,38 @@ void Tracker::MainLoop()
             if (statsCurX % 20 > 15) {
                 for (int y = 99 ; y < 1000; y += 100) {
                     rectangle(statsImg, cv::Point(statsCurX, statsImg.rows - y),  cv::Point(statsCurX + 2, statsImg.rows - y + 2), cv::Scalar(0, 0, 0), -1);
+                }
+            }
+
+            if (65 < statsCurX && statsCurX < 70) {
+                for (int y = 99 ; y < 1000; y += 100) {
+                    cv::putText(statsImg, std::to_string((y/100)*10 + 10) + "ms", cv::Point(10, statsImg.rows - y - 3), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
+                }
+            }
+
+            if (80 < statsCurX && statsCurX < 310) {
+                int row = 0;
+                const std::vector<std::pair<std::string, std::string>> table = {
+                    { "ultramarine", "frameWriteMsecs" },
+                    { "red", "frameReadMsecs" },
+                    { "yellow", "getPoseMsecs" },
+                    { "navy", "toGrayMsecs" },
+                    { "green", "processPoseMsecs" },
+                    { "purple", "templMatchMsecs" },
+                    { "cyan", "doMaskMsecs" },
+                    { "brown", "preJpegMsecs" },
+                    { "magenta", "jpegMsecs" },
+                    { "blue", "postJpegMsecs" },
+                    { "lime", "preApriltagMsecs" },
+                    { "wine", "apriltagMsecs" },
+                    { "orange", "postApriltagMsecs" },
+                    { "dark green", "detectMsecs" },
+                    { "ultramarine", "sendTrackerMsecs" },
+                };
+                for (auto pair : table)
+                {
+                    rectangle(statsImg, cv::Point(80, row*25 + 355), cv::Point(95, row*25 + 370),  colors[pair.first], -1);
+                    cv::putText(statsImg, std::string(pair.second), cv::Point(100, row--*25 + 370), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
                 }
             }
 
