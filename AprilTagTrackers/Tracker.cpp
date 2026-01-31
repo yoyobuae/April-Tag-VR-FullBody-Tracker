@@ -953,7 +953,7 @@ void CameraV4L2::setCameraParams()
 #if 1
     dev << v4l2_control{ V4L2_CID_FOCUS_AUTO, 0 };
     dev << v4l2_control{ V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL }
-        << v4l2_control{ V4L2_CID_EXPOSURE_ABSOLUTE, 30 }
+        << v4l2_control{ V4L2_CID_EXPOSURE_ABSOLUTE, 15 }
         << v4l2_control{ V4L2_CID_FOCUS_ABSOLUTE, 120 }
         << v4l2_control{ V4L2_CID_BRIGHTNESS, 64 }
         << v4l2_control{ V4L2_CID_CONTRAST, 20 }
