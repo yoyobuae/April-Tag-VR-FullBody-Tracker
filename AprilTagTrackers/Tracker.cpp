@@ -3447,7 +3447,10 @@ void Tracker::MainLoop()
             cv::Mat *outMatchTemplateResult = new cv::Mat();
             matchTemplateResult.convertTo(*outMatchTemplateResult, CV_8UC1, 255.0);
 
-            gui->CallAfter([outImg, outMatchTemplateResult, didMatchTemplate, this] ()
+            cv::Mat *outThresholded = new cv::Mat();
+            thresholded.convertTo(*outThresholded, CV_8UC1, 255.0);
+
+            gui->CallAfter([outImg, outMatchTemplateResult, didMatchTemplate, outThresholded, this] ()
                            {
                            if (this->rotate)
                            {
@@ -3457,6 +3460,7 @@ void Tracker::MainLoop()
                            cv::imshow("out", *outImg);
                            cv::resizeWindow("out", drawImgSize, drawImgSize);
                            //if (didMatchTemplate) cv::imshow("matchTemplateResult", *outMatchTemplateResult);
+                           //if (didMatchTemplate) cv::imshow("thresholded", *outThresholded);
                            cv::waitKey(1);
                            delete(outImg);
                            delete(outMatchTemplateResult);
