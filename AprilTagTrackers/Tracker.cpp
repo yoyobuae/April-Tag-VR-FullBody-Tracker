@@ -2684,10 +2684,15 @@ void Tracker::MainLoop()
         if (!(doMasking && circularWindow))
         {
             static int quadrant = 0;
-            int left = (quadrant % 8) * frame->cols()/8;
-            int top = ((quadrant / 8) % 8) * frame->rows()/8;
-            int right = ((quadrant % 8) + 1) * frame->cols()/8 - 1;
-            int bottom = (((quadrant / 8) % 8) + 1) * frame->rows()/8 - 1;
+            int left = (quadrant % 4) * frame->cols()/4 - frame->cols()/32;
+            int top = ((quadrant / 4) % 4) * frame->rows()/4 - frame->cols()/32;
+            int right = ((quadrant % 4) + 1) * frame->cols()/4 + frame->cols()/32;
+            int bottom = (((quadrant / 4) % 4) + 1) * frame->rows()/4 + frame->cols()/32;
+
+            left   = (left   >= frame->cols()) ? (frame->cols() - 1) : ((left   < 0) ? 0 : left);
+            right  = (right  >= frame->cols()) ? (frame->cols() - 1) : ((right  < 0) ? 0 : right);
+            top    = (top    >= frame->rows()) ? (frame->rows() - 1) : ((top    < 0) ? 0 : top);
+            bottom = (bottom >= frame->rows()) ? (frame->rows() - 1) : ((bottom < 0) ? 0 : bottom);
 
             cv::Rect roi(cv::Point(left, top), cv::Point(right, bottom));
 
@@ -2696,7 +2701,7 @@ void Tracker::MainLoop()
             rois.push_back(roi);
             drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(255, 64, 64), 3); });
 
-            quadrant = (quadrant + 1) % 64;
+            quadrant = (quadrant + 1) % 16;
         }
         detector_pre_jpeg += get_timestamp() - detector_pre_jpeg_start;
 
