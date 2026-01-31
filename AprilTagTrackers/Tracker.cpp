@@ -1863,10 +1863,12 @@ void Tracker::MainLoop()
     auto frame = std::unique_ptr<FrameData>(camera->MakeFrame());
     cv::Mat drawImg, ycc, gray, cr;
     cv::Mat searchGray;
-    cv::Mat prevSearchGray;
+    std::vector<cv::Mat> prevSearchGray;
+    int prevSearchGrayIdx = 0;
 
     cv::Mat matchTemplateResult;
     bool didMatchTemplate = false;
+    cv::Mat thresholded;
 
 
     //setup all variables that need to be stored for each tracker and initialize them
@@ -2220,7 +2222,7 @@ void Tracker::MainLoop()
                 continue;
 
             cv::matchTemplate(cv::Mat(searchGray, cv::Rect(x, y, w, h)),
-                              cv::Mat(prevSearchGray, trackerStatus[i].oldRoi),
+                              cv::Mat(prevSearchGray[trackerStatus[i].oldRoiIdx], trackerStatus[i].oldRoi),
                               matchTemplateResult, cv::TM_CCOEFF);
             didMatchTemplate = true;
 
@@ -2241,7 +2243,7 @@ void Tracker::MainLoop()
                 *it = (*it - min)/(max - min);
             }
 
-            cv::Mat thresholded;
+            // cv::Mat thresholded;
             cv::threshold(matchTemplateResult, thresholded, 0.85, 1.0, cv::THRESH_BINARY);
 
             thresholded.convertTo(thresholded, CV_8UC1, 255.0);
@@ -2875,7 +2877,8 @@ void Tracker::MainLoop()
         // Store a snapshot image of each tracker
         for (int i = 0; i < trackerNum; ++i)
         {
-            trackerStatus[i].doImageMatching = false;
+            if (trackerStatus[i].oldRoiIdx == prevSearchGrayIdx)
+                trackerStatus[i].doImageMatching = false;
 
             std::vector<float> trackerXCoords;
             std::vector<float> trackerYCoords;
@@ -2917,11 +2920,18 @@ void Tracker::MainLoop()
                     trackerStatus[i].doImageMatching = true;
                     trackerStatus[i].oldCenter = cv::Point2f((left + right)/2, (top + bottom)/2);
                     trackerStatus[i].oldRoi = cv::Rect(x/8, y/8, w/8, h/8);
+                    trackerStatus[i].oldRoiIdx = prevSearchGrayIdx;
                 }
             }
         }
-
-        searchGray.copyTo(prevSearchGray);
+        {
+            if (prevSearchGray.size() < 10) {
+                prevSearchGray.push_back(cv::Mat());
+            }
+            searchGray.copyTo(prevSearchGray[prevSearchGrayIdx]);
+            if (++prevSearchGrayIdx >= 10)
+                prevSearchGrayIdx = 0;
+        }
 
         // Adjust the detected tag corners x/y coordinates to rotate the image reference frame
         for (int i = 0; i < corners.size(); i++) {

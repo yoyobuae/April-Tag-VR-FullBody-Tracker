@@ -96,6 +96,7 @@ struct TrackerStatus {
     double a, b, c;
     double qw, qx, qy, qz;
     cv::Rect oldRoi;
+    int oldRoiIdx;
     bool doImageMatching;
     cv::Point2f oldCenter;
     int pose_delta_index;
