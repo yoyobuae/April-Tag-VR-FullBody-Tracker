@@ -2224,6 +2224,8 @@ void Tracker::MainLoop()
                               matchTemplateResult, cv::TM_CCOEFF);
             didMatchTemplate = true;
 
+            drawUiFuncs.push_back([=](cv::Mat &img){cv::rectangle(img, cv::Point(searchLeft, searchTop), cv::Point(searchRight, searchBottom), cv::Scalar(64, 64, 255), 3); });
+
             float min = 0.0f, max = 0.0f;
             auto it = matchTemplateResult.begin<float>(), it_end = matchTemplateResult.end<float>();
             for (; it != it_end; ++it)
