@@ -3222,10 +3222,10 @@ void Tracker::MainLoop()
                     ret >> pose_from_driver.qz;
                     ret >> pose_from_driver.pose_valid;
 
-                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average - trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 10.0;
+                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average - trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 100.0;
                     trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] = compress(pose_from_driver - pose_local);
-                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average + trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 10.0;
-                    if(++trackerStatus[i].pose_delta_index == 10)
+                    trackerStatus[i].pose_delta_average = trackerStatus[i].pose_delta_average + trackerStatus[i].pose_delta_history[trackerStatus[i].pose_delta_index] / 100.0;
+                    if(++trackerStatus[i].pose_delta_index == 100)
                         trackerStatus[i].pose_delta_index = 0;
 
 #if 0
