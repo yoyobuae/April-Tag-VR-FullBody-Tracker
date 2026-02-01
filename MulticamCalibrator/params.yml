@@ -32,7 +32,7 @@ arucoParams:
    perspectiveRemovePixelPerCell: 4
    polygonalApproxAccuracyRate: 0.029999999999999999
 cameraAddr1: "http://127.0.0.1:8080/"
-cameraAddr2: "http://192.168.9.133:8081/"
+cameraAddr2: "http://127.0.0.1:8081/"
 cameraApiPreference1: 0
 cameraApiPreference2: 0
 camFps1: 30
@@ -51,8 +51,8 @@ cameraMatrix2: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ 2992.979372694927, 0., 1526.5599738553569, 0.,
-       2992.2332309662288, 1884.219388729716, 0., 0., 1. ]
+   data: [ 3019.3498364817951, 0., 1481.6236604819405, 0.,
+       3020.862772914109, 1899.8757305378379, 0., 0., 1. ]
 distortionCoeffs1: !!opencv-matrix
    rows: 1
    cols: 5
@@ -64,9 +64,9 @@ distortionCoeffs2: !!opencv-matrix
    rows: 1
    cols: 5
    dt: d
-   data: [ 0.15331453519833196, -0.43284038858461998,
-       0.00061012912251898318, 0.00048023083800456142,
-       0.31377579760927338 ]
+   data: [ 0.15110760073178592, -0.39303184990234469,
+       0.00078364254652460203, 0.00059496909418443541,
+       0.27415297322213067 ]
 stdDeviationsIntrinsics1: !!opencv-matrix
    rows: 18
    cols: 1
@@ -3700,17 +3700,17 @@ rotateCounterCl1: 0
 rotateCounterCl2: 0
 coloredMarkers: 0
 calibOffsetX1: 0.
-calibOffsetX2: 175.93494025147572
+calibOffsetX2: -110.55759102307181
 calibOffsetY1: 0.
-calibOffsetY2: 203.13025630777605
+calibOffsetY2: 201.60420068545642
 calibOffsetZ1: 0.
-calibOffsetZ2: -38.350224950229396
+calibOffsetZ2: -27.368925999204226
 calibOffsetA1: 0.
-calibOffsetA2: 140.13195984264874
+calibOffsetA2: 137.07014977084745
 calibOffsetB1: 0.
-calibOffsetB2: 86.727442161961079
+calibOffsetB2: -73.128760602203627
 calibOffsetC1: 0.
-calibOffsetC2: 1.8104090709088889
+calibOffsetC2: 1.5904537185349843
 circularWindow: 1
 smoothingFactor: 0.5
 ignoreTracker0: 0
@@ -3727,11 +3727,11 @@ wtranslation2: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [ 0.057057404496221438, 0.63859236616641402,
-       -0.76742718758316308, 1.7593494025147574, -0.031592347436896775,
-       -0.76713986203042184, -0.64070175056118961, 2.0313025630777606,
-       -0.99787164345344093, 0.060800930085444002, -0.023596102216416327,
-       -0.38350224950229395, 0., 0., 0., 1. ]
+   data: [ 0.29011044142635195, -0.65768691468367169, 0.6951886684876396,
+       -1.1055759102307181, -0.027755114243036422, -0.73190674006639445,
+       -0.68084064078612649, 2.0160420068545641, 0.95659197562544396,
+       0.17822322750148639, -0.23058750157597216, -0.27368925999204224,
+       0., 0., 0., 1. ]
 wrotation1: !!opencv-matrix
    rows: 4
    cols: 1
@@ -3742,8 +3742,8 @@ wrotation2: !!opencv-matrix
    rows: 4
    cols: 1
    dt: d
-   data: [ 0.25803170359927835, 0.67966781752983185, 0.22327048376899991,
-       -0.64932394752499778 ]
+   data: [ 0.28618883616590696, 0.75043398828090113,
+       -0.22834749838963961, 0.550274658026351 ]
 cameraSettings1: 0
 cameraSettings2: 0
 chessboardCalib: 0
