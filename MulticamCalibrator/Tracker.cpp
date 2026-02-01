@@ -1741,13 +1741,21 @@ void Tracker::MainLoop1()
 
                     if (startResting)
                     {
-                        printf("start resting 1\n");
+                        printf("start resting 1 ");
+                        if (calibratorProjected1.size() > 50 && calibratorReprojected2.size() > 50)
+                            reprojectionError(calibratorProjected1, calibratorReprojected2, calibratorProjectedTimes1, calibratorReprojectedTimes2);
+                        else
+                            printf("\n");
                         isResting1 = true;
                     }
 
                     if (stopResting)
                     {
-                        printf("stop resting 1\n");
+                        printf("stop resting 1  ");
+                        if (calibratorProjected1.size() > 50 && calibratorReprojected2.size() > 50)
+                            reprojectionError(calibratorProjected1, calibratorReprojected2, calibratorProjectedTimes1, calibratorReprojectedTimes2);
+                        else
+                            printf("\n");
                         isResting1 = false;
                     }
 
@@ -1766,7 +1774,6 @@ void Tracker::MainLoop1()
 
                         if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
                         {
-                            reprojectionError(calibratorProjected1, calibratorReprojected1, calibratorProjectedTimes1, calibratorReprojectedTimes1);
                             cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                             wtranslation2 = wtranslation * wtranslation2;
                             cv::Mat R = (cv::Mat_<double>(3, 3) <<
@@ -2386,13 +2393,21 @@ void Tracker::MainLoop2()
 
                     if (startResting)
                     {
-                        printf("start resting 2\n");
+                        printf("start resting 2 ");
+                        if (calibratorProjected2.size() > 50 && calibratorReprojected1.size() > 50)
+                            reprojectionError(calibratorProjected2, calibratorReprojected1, calibratorProjectedTimes2, calibratorReprojectedTimes1);
+                        else
+                            printf("\n");
                         isResting2 = true;
                     }
 
                     if (stopResting)
                     {
-                        printf("stop resting 2\n");
+                        printf("stop resting 2  ");
+                        if (calibratorProjected2.size() > 50 && calibratorReprojected1.size() > 50)
+                            reprojectionError(calibratorProjected2, calibratorReprojected1, calibratorProjectedTimes2, calibratorReprojectedTimes1);
+                        else
+                            printf("\n");
                         isResting2 = false;
                     }
 
@@ -2411,7 +2426,6 @@ void Tracker::MainLoop2()
 
                         if (calibratorPoints1.size() > pointsThreshold && calibratorPoints2.size() > pointsThreshold)
                         {
-                            reprojectionError(calibratorProjected1, calibratorReprojected2, calibratorProjectedTimes1, calibratorReprojectedTimes2);
                             cv::Mat wtranslation = transformFromPoints(calibratorPoints2, calibratorPoints1, calibratorTimes2, calibratorTimes1);
                             wtranslation2 = wtranslation * wtranslation2;
                             cv::Mat R = (cv::Mat_<double>(3, 3) <<
